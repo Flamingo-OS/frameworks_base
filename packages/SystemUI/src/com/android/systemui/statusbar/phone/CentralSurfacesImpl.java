@@ -60,6 +60,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -67,6 +68,7 @@ import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
+import android.database.ContentObserver;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.hardware.devicestate.DeviceStateManager;
@@ -143,6 +145,7 @@ import com.android.systemui.charging.WirelessChargingAnimation;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.demomode.DemoMode;
@@ -237,6 +240,7 @@ import com.android.systemui.util.DumpUtilsKt;
 import com.android.systemui.util.WallpaperController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.concurrency.MessageRouter;
+import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.volume.VolumeComponent;
 import com.android.systemui.wmshell.BubblesManager;
 import com.android.wm.shell.bubbles.Bubbles;
@@ -674,7 +678,8 @@ public class CentralSurfacesImpl extends CoreStartable implements
             (extractor, which) -> updateTheme();
 
     private final InteractionJankMonitor mJankMonitor;
-
+    private final SettingsObserver mSettingsObserver;
+    private final SystemSettings mSystemSettings;
 
     /**
      * Public constructor for CentralSurfaces.
@@ -780,7 +785,9 @@ public class CentralSurfacesImpl extends CoreStartable implements
             DeviceStateManager deviceStateManager,
             DreamOverlayStateController dreamOverlayStateController,
             WiredChargingRippleController wiredChargingRippleController,
-            IDreamManager dreamManager) {
+            IDreamManager dreamManager,
+            SystemSettings systemSettings,
+            @Background Handler backgroundHandler) {
         super(context);
         mNotificationsController = notificationsController;
         mFragmentService = fragmentService;
@@ -868,6 +875,8 @@ public class CentralSurfacesImpl extends CoreStartable implements
         mJankMonitor = jankMonitor;
         mDreamOverlayStateController = dreamOverlayStateController;
 
+        mSettingsObserver = new SettingsObserver(backgroundHandler);
+
         mLockscreenShadeTransitionController = lockscreenShadeTransitionController;
         mStartingSurfaceOptional = startingSurfaceOptional;
         mNotifPipelineFlags = notifPipelineFlags;
@@ -876,6 +885,7 @@ public class CentralSurfacesImpl extends CoreStartable implements
         statusBarWindowStateController.addListener(this::onStatusBarWindowStateChanged);
 
         mScreenOffAnimationController = screenOffAnimationController;
+        mSystemSettings = systemSettings;
 
         mPanelExpansionStateManager.addExpansionListener(this::onPanelExpansionChanged);
 
@@ -964,6 +974,9 @@ public class CentralSurfacesImpl extends CoreStartable implements
         } else if (DEBUG) {
             Log.v(TAG, "start(): no wallpaper service ");
         }
+
+        mSettingsObserver.update();
+        mSettingsObserver.observe();
 
         // Set up the initial notification state. This needs to happen before CommandQueue.disable()
         setUpPresenter();
@@ -4010,6 +4023,63 @@ public class CentralSurfacesImpl extends CoreStartable implements
     @Override
     public boolean isDeviceInteractive() {
         return mDeviceInteractive;
+    }
+
+    private class SettingsObserver extends ContentObserver {
+
+        private final Handler mBackgroundHandler;
+
+        SettingsObserver(Handler backgroundHandler) {
+            super(backgroundHandler);
+            mBackgroundHandler = backgroundHandler;
+        }
+
+        void observe() {
+            mSystemSettings.registerContentObserverForUser(Settings.System.DOUBLE_TAP_SLEEP_LOCKSCREEN, this, UserHandle.USER_ALL);
+            mSystemSettings.registerContentObserverForUser(Settings.System.DOUBLE_TAP_SLEEP_GESTURE, this, UserHandle.USER_ALL);
+        }
+
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            switch (uri.getLastPathSegment()) {
+                case Settings.System.DOUBLE_TAP_SLEEP_LOCKSCREEN:
+                    updateDoubleTapLsGesture();
+                    break;
+                case Settings.System.DOUBLE_TAP_SLEEP_GESTURE:
+                    updateDoubleTapSbGesture();
+                    break;
+            }
+        }
+
+        void update() {
+            mBackgroundHandler.post(() -> {
+                updateDoubleTapSbGesture();
+                updateDoubleTapLsGesture();
+            });
+        }
+
+        private void updateDoubleTapSbGesture() {
+            final boolean isDoubleTapSbEnabled = mSystemSettings.getIntForUser(
+                Settings.System.DOUBLE_TAP_SLEEP_GESTURE, 0, UserHandle.USER_CURRENT) == 1;
+            mMainHandler.post(() -> {
+                if (mNotificationPanelViewController != null) {
+                    mNotificationPanelViewController.setSbDoubleTapToSleep(isDoubleTapSbEnabled);
+                }
+                if (mLockscreenShadeTransitionController != null) {
+                    mLockscreenShadeTransitionController.getTouchHelper().updateDoubleTapToSleep(isDoubleTapSbEnabled);
+                }
+            });
+        }
+
+        private void updateDoubleTapLsGesture() {
+            final boolean isDoubleTapLockscreenEnabled = mSystemSettings.getIntForUser(
+                    Settings.System.DOUBLE_TAP_SLEEP_LOCKSCREEN, 0, UserHandle.USER_CURRENT) == 1;
+            mMainHandler.post(() -> {
+                if (mNotificationPanelViewController != null) {
+                    mNotificationPanelViewController.setLockscreenDoubleTapToSleep(isDoubleTapLockscreenEnabled);
+                }
+            });
+        }
     }
 
     private final BroadcastReceiver mBannerActionBroadcastReceiver = new BroadcastReceiver() {
