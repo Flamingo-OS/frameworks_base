@@ -211,5 +211,6 @@ public class SecureSettings {
         Settings.Secure.VOLUME_LINK_NOTIFICATION,
         Settings.Secure.GESTURE_NAVBAR_LENGTH_MODE,
         Settings.Secure.DISABLE_SECURE_TILES_ON_LOCKSCREEN,
+        Settings.Secure.NAVIGATION_BAR_INVERSE,
     };
 }
