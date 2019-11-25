@@ -66,4 +66,7 @@
     <!-- List of system packages to exempted from location privacy indicator -->
     <string-array name="config_systemLocationWhitelistedPackages" translatable="false" />
 
+    <!-- Whether to show WiFi/Hotspot standard -->
+    <bool name="config_show_network_standard">false</bool>
+
 </resources>

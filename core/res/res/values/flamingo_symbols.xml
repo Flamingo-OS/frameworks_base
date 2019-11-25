@@ -73,4 +73,7 @@
 
     <java-symbol type="array" name="config_systemLocationWhitelistedPackages" />
 
+    <!-- Whether to show WiFi/Hotspot standard -->
+    <java-symbol type="bool" name="config_show_network_standard" />
+
 </resources>
