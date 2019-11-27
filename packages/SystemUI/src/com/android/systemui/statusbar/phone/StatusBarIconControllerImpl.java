@@ -18,9 +18,12 @@ package com.android.systemui.statusbar.phone;
 
 import android.annotation.NonNull;
 import android.content.Context;
+import android.database.ContentObserver;
 import android.graphics.drawable.Icon;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
@@ -29,10 +32,13 @@ import android.view.ViewGroup;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
+import com.android.systemui.dagger.qualifiers.Background;
+import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.demomode.DemoMode;
 import com.android.systemui.demomode.DemoModeController;
 import com.android.systemui.dump.DumpManager;
+import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.StatusIconDisplayable;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.CallIndicatorIconState;
@@ -43,6 +49,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerService.Tunable;
+import com.android.systemui.util.settings.SystemSettings;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -58,14 +65,20 @@ import javax.inject.Inject;
  */
 @SysUISingleton
 public class StatusBarIconControllerImpl extends StatusBarIconList implements Tunable,
-        ConfigurationListener, Dumpable, CommandQueue.Callbacks, StatusBarIconController, DemoMode {
+        ConfigurationListener, Dumpable, CommandQueue.Callbacks, StatusBarIconController,
+        DemoMode, UserTracker.Callback {
 
     private static final String TAG = "StatusBarIconController";
 
     private final ArrayList<IconManager> mIconGroups = new ArrayList<>();
     private final ArraySet<String> mIconHideList = new ArraySet<>();
 
-    private Context mContext;
+    private final Context mContext;
+    private final SystemSettings mSystemSettings;
+    private final Handler mHandler;
+    private final Handler mBackgroundHandler;
+
+    private boolean mIsOldSignalStyle = false;
 
     /** */
     @Inject
@@ -75,12 +88,19 @@ public class StatusBarIconControllerImpl extends StatusBarIconList implements Tu
             DemoModeController demoModeController,
             ConfigurationController configurationController,
             TunerService tunerService,
-            DumpManager dumpManager) {
+            DumpManager dumpManager,
+            @Main Handler mainHandler,
+            @Background Handler backgroundHandler,
+            SystemSettings systemSettings,
+            UserTracker userTracker) {
         super(context.getResources().getStringArray(
                 com.android.internal.R.array.config_statusBarIcons));
         configurationController.addCallback(this);
 
         mContext = context;
+        mSystemSettings = systemSettings;
+        mHandler = mainHandler;
+        mBackgroundHandler = backgroundHandler;
 
         loadDimens();
 
@@ -88,6 +108,41 @@ public class StatusBarIconControllerImpl extends StatusBarIconList implements Tu
         tunerService.addTunable(this, ICON_HIDE_LIST);
         demoModeController.addCallback(this);
         dumpManager.registerDumpable(getClass().getSimpleName(), this);
+
+        updateSignalStyle();
+        final ContentObserver settingsObserver = new ContentObserver(backgroundHandler) {
+            @Override
+            public void onChange(boolean selfChange) {
+                updateSignalStyle();
+            }
+        };
+        mSystemSettings.registerContentObserverForUser(
+            Settings.System.USE_OLD_MOBILETYPE,
+            settingsObserver,
+            UserHandle.USER_ALL
+        );
+        userTracker.addCallback(this, (r) -> { r.run(); });
+    }
+
+    private boolean getIsOldSignalStyle() {
+        return mSystemSettings.getIntForUser(
+            Settings.System.USE_OLD_MOBILETYPE,
+            0, UserHandle.USER_CURRENT
+        ) == 1;
+    }
+
+    private void updateSignalStyle() {
+        mBackgroundHandler.post(() -> {
+            final boolean isOldSignalStyle = getIsOldSignalStyle();
+            mHandler.post(() -> {
+                if (mIsOldSignalStyle == isOldSignalStyle) return;
+                mIsOldSignalStyle = isOldSignalStyle;
+                mIconGroups.forEach(group -> {
+                    group.setMobileSignalStyle(mIsOldSignalStyle);
+                    group.updateMobileIconStyle();
+                });
+            });
+        });
     }
 
     /** */
@@ -101,6 +156,7 @@ public class StatusBarIconControllerImpl extends StatusBarIconList implements Tu
         }
 
         group.setController(this);
+        group.setMobileSignalStyle(mIsOldSignalStyle);
         mIconGroups.add(group);
         List<Slot> allSlots = getSlots();
         for (int i = 0; i < allSlots.size(); i++) {
@@ -502,5 +558,12 @@ public class StatusBarIconControllerImpl extends StatusBarIconList implements Tu
     public void onDensityOrFontScaleChanged() {
         loadDimens();
         refreshIconGroups();
+    }
+
+    @Override
+    public void onUserChanged(int newUser, Context userContext) {
+        mHandler.post(() -> {
+            updateSignalStyle();
+        });
     }
 }
