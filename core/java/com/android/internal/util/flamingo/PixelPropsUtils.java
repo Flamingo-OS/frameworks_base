@@ -19,6 +19,7 @@ package com.android.internal.util.flamingo;
 
 import static java.util.Map.entry;
 
+import android.app.Application;
 import android.os.Build;
 import android.util.Log;
 
@@ -37,6 +38,7 @@ public final class PixelPropsUtils {
 
     private static volatile boolean sIsGms = false;
     public static final String PACKAGE_GMS = "com.google.android.gms";
+    public static final String PROCESS_GMS_UNSTABLE = "com.google.android.gms.unstable";
 
     private static final Map<String, Object> commonProps = Map.ofEntries(
         entry("BRAND", "google"),
@@ -113,7 +115,8 @@ public final class PixelPropsUtils {
         if (packagesToChange.contains(packageName)) {
             commonProps.forEach(PixelPropsUtils::setPropValue);
             cheetahProps.forEach((key, value) -> {
-                if (key.equals("MODEL") && packageName.equals(PACKAGE_GMS)) {
+                if (key.equals("MODEL") && packageName.equals(PACKAGE_GMS) 
+                    && PROCESS_GMS_UNSTABLE.equals(Application.getProcessName()))) {
                     sIsGms = true;
                 } else {
                     setPropValue(key, value);
