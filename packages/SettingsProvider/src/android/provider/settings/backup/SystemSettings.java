@@ -106,5 +106,6 @@ public class SystemSettings {
         Settings.System.AUTO_BRIGHTNESS_ONE_SHOT,
         Settings.System.SHOW_FOURG_ICON,
         Settings.System.USE_OLD_MOBILETYPE,
+        Settings.System.INCALL_FEEDBACK_VIBRATE,
     };
 }
