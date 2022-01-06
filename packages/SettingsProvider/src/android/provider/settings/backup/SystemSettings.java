@@ -107,5 +107,6 @@ public class SystemSettings {
         Settings.System.SHOW_FOURG_ICON,
         Settings.System.USE_OLD_MOBILETYPE,
         Settings.System.INCALL_FEEDBACK_VIBRATE,
+        Settings.System.QS_SHOW_BATTERY_ESTIMATE,
     };
 }
