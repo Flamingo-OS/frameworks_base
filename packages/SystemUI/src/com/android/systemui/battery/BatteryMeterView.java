@@ -49,7 +49,6 @@ import android.widget.TextView;
 import androidx.annotation.StyleRes;
 import androidx.annotation.VisibleForTesting;
 
-
 import com.android.settingslib.graph.CircleBatteryDrawable;
 import com.android.settingslib.graph.ThemedBatteryDrawable;
 import com.android.systemui.DualToneHandler;
@@ -458,6 +457,10 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
         if (mUnknownStateDrawable != null) {
             mUnknownStateDrawable.setTint(singleToneColor);
         }
+    }
+
+    public boolean isCircleBatteryStyle() {
+        return mBatteryStyle == BATTERY_STYLE_CIRCLE;
     }
 
     public void dump(PrintWriter pw, String[] args) {
