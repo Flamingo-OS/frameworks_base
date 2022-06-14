@@ -174,6 +174,13 @@ class PrivacyDotViewController @Inject constructor(
         }
     }
 
+    fun setHiddenForGameMode(hidden: Boolean) {
+        dlog("setHiddenForGameMode: hidden = $hidden")
+        synchronized(lock) {
+            nextViewState = nextViewState.copy(hiddenByGameMode = hidden)
+        }
+    }
+
     @UiThread
     private fun hideDotView(dot: View, animate: Boolean) {
         dot.clearAnimation()
@@ -627,10 +634,14 @@ private data class ViewState(
     val rotation: Int = 0,
     val paddingTop: Int = 0,
     val cornerIndex: Int = -1,
-    val designatedCorner: View? = null
+    val designatedCorner: View? = null,
+    val hiddenByGameMode: Boolean = false,
 ) {
     fun shouldShowDot(): Boolean {
-        return systemPrivacyEventIsActive && !shadeExpanded && !qsExpanded
+        return systemPrivacyEventIsActive &&
+            !shadeExpanded &&
+            !qsExpanded &&
+            !hiddenByGameMode
     }
 
     fun needsLayout(other: ViewState): Boolean {

@@ -17,6 +17,7 @@
 package android.provider.settings.validators;
 
 import static android.provider.settings.validators.SettingsValidators.ANY_STRING_VALIDATOR;
+import static android.provider.settings.validators.SettingsValidators.APP_LIST_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.BOOLEAN_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.COMPONENT_NAME_VALIDATOR;
 import static android.provider.settings.validators.SettingsValidators.LENIENT_IP_ADDRESS_VALIDATOR;
@@ -292,5 +293,11 @@ public class SystemSettingsValidators {
         VALIDATORS.put(System.QQS_SHOW_BRIGHTNESS, BOOLEAN_VALIDATOR);
         VALIDATORS.put(System.SHOW_AUTO_BRIGHTNESS_BUTTON, BOOLEAN_VALIDATOR);
         VALIDATORS.put(System.BRIGHTNESS_SLIDER_POSITION, new InclusiveIntegerRangeValidator(0, 1));
+        VALIDATORS.put(System.GAMESPACE_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(System.GAMESPACE_PACKAGE_LIST, APP_LIST_VALIDATOR);
+        VALIDATORS.put(System.GAMESPACE_DYNAMIC_MODE, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(System.GAMESPACE_DISABLE_HEADSUP, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(System.GAMESPACE_DISABLE_FULLSCREEN_INTENT, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(System.GAMESPACE_DISABLE_CALL_RINGING, BOOLEAN_VALIDATOR);
     }
 }

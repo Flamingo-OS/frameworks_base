@@ -76,6 +76,7 @@ import com.android.systemui.statusbar.phone.dagger.CentralSurfacesComponent;
 import com.android.systemui.statusbar.policy.HeadsUpUtil;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.wmshell.BubblesManager;
+import com.flamingo.systemui.game.GameSpaceServiceDelegate;
 
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -117,6 +118,7 @@ class StatusBarNotificationActivityStarter implements NotificationActivityStarte
     private final LockPatternUtils mLockPatternUtils;
     private final StatusBarRemoteInputCallback mStatusBarRemoteInputCallback;
     private final ActivityIntentHelper mActivityIntentHelper;
+    private final GameSpaceServiceDelegate mGameSpaceServiceDelegate;
 
     private final NotifPipelineFlags mNotifPipelineFlags;
     private final MetricsLogger mMetricsLogger;
@@ -159,6 +161,7 @@ class StatusBarNotificationActivityStarter implements NotificationActivityStarte
             StatusBarRemoteInputCallback remoteInputCallback,
             ActivityIntentHelper activityIntentHelper,
             NotifPipelineFlags notifPipelineFlags,
+            GameSpaceServiceDelegate gameSpaceServiceDelegate,
             MetricsLogger metricsLogger,
             StatusBarNotificationActivityStarterLogger logger,
             OnUserInteractionCallback onUserInteractionCallback,
@@ -193,6 +196,7 @@ class StatusBarNotificationActivityStarter implements NotificationActivityStarte
         mStatusBarRemoteInputCallback = remoteInputCallback;
         mActivityIntentHelper = activityIntentHelper;
         mNotifPipelineFlags = notifPipelineFlags;
+        mGameSpaceServiceDelegate = gameSpaceServiceDelegate;
         mMetricsLogger = metricsLogger;
         mLogger = logger;
         mOnUserInteractionCallback = onUserInteractionCallback;
@@ -639,7 +643,8 @@ class StatusBarNotificationActivityStarter implements NotificationActivityStarte
     }
 
     private boolean shouldSuppressFullScreenIntent(NotificationEntry entry) {
-        if (mPresenter.isDeviceInVrMode()) {
+        if (mPresenter.isDeviceInVrMode() ||
+                mGameSpaceServiceDelegate.disallowLaunchingFullScreenIntent()) {
             return true;
         }
 
