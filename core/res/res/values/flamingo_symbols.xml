@@ -80,4 +80,7 @@
     <java-symbol type="string" name="unlock_application" />
     <java-symbol type="array" name="config_appLockAllowedSystemApps" />
 
+    <!-- Button that opens the screen with details of an application error -->
+    <java-symbol type="string" name="aerr_show_details" />
+
 </resources>
