@@ -288,9 +288,7 @@ public class Clock extends TextView implements
     }
 
     private void updateClockVisibility() {
-        boolean visible = shouldBeVisible();
-        int visibility = visible ? View.VISIBLE : View.GONE;
-        super.setVisibility(visibility);
+        super.setVisibility(shouldBeVisible() ? View.VISIBLE : View.GONE);
     }
 
     final void updateClock() {
@@ -340,7 +338,6 @@ public class Clock extends TextView implements
         } else if (StatusBarIconController.ICON_HIDE_LIST.equals(key)) {
             setClockVisibleByUser(!StatusBarIconController.getIconHideList(getContext(), newValue)
                     .contains("clock"));
-            updateClockVisibility();
         }
     }
 
