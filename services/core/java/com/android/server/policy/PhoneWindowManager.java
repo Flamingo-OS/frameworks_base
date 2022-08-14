@@ -624,6 +624,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private boolean mLockNowPending = false;
 
+    private DeviceKeyManagerInternal mDeviceKeyManager = null;
+
     private static final int MSG_DISPATCH_MEDIA_KEY_WITH_WAKE_LOCK = 3;
     private static final int MSG_DISPATCH_MEDIA_KEY_REPEAT_WITH_WAKE_LOCK = 4;
     private static final int MSG_KEYGUARD_DRAWN_COMPLETE = 5;
@@ -861,6 +863,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    private DeviceKeyManagerInternal getDeviceKeyManager() {
+        synchronized (mServiceAcquireLock) {
+            if (mDeviceKeyManager == null) {
+                mDeviceKeyManager = LocalServices.getService(DeviceKeyManagerInternal.class);
+            }
+            return mDeviceKeyManager;
+        }
+    }
 
     // returns true if the key was handled and should not be passed to the user
     private boolean backKeyPress() {
@@ -3026,6 +3036,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return key_consumed;
         }
 
+        // Specific device key handling
+        if (handleWithDeviceKeyHandler(event)) {
+            return -1;
+        }
+
         // Reserve all the META modifier combos for system behavior
         if ((metaState & KeyEvent.META_META_ON) != 0) {
             return key_consumed;
@@ -3076,6 +3091,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 Slog.e(TAG, "Error taking bugreport", e);
             }
         }
+    }
+
+    private boolean handleWithDeviceKeyHandler(KeyEvent event) {
+        final DeviceKeyManagerInternal dkm = getDeviceKeyManager();
+        return dkm != null && dkm.handleKeyEvent(event);
     }
 
     // TODO(b/117479243): handle it in InputPolicy
@@ -3786,6 +3806,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && (policyFlags & WindowManagerPolicy.FLAG_VIRTUAL) != 0
                 && (!isNavBarVirtKey || mNavBarVirtualKeyHapticFeedbackEnabled)
                 && event.getRepeatCount() == 0;
+
+        // Specific device key handling
+        if (handleWithDeviceKeyHandler(event)) {
+            return 0;
+        }
 
         // Handle special keys.
         switch (keyCode) {
