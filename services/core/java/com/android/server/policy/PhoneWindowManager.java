@@ -2241,8 +2241,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Settings.Global.KEY_CHORD_POWER_VOLUME_UP,
                     mContext.getResources().getInteger(
                             com.android.internal.R.integer.config_keyChordPowerVolumeUp));
-            mTorchLongPressPowerEnabled = Settings.Secure.getInt(resolver,
-                    Settings.Secure.TORCH_LONG_PRESS_POWER, 0) == 1;
+            mTorchLongPressPowerEnabled = Settings.Secure.getIntForUser(resolver,
+                    Settings.Secure.TORCH_LONG_PRESS_POWER, 0,
+                    UserHandle.USER_CURRENT) == 1;
         }
         if (updateRotation) {
             updateRotation(true);
