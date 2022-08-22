@@ -31,7 +31,8 @@ class EdgeLightView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleRes: Int = 0,
     defStyleAttr: Int = 0,
-): RelativeLayout(context, attrs, defStyleRes, defStyleAttr) {
+) : RelativeLayout(context, attrs, defStyleRes, defStyleAttr) {
+
     private var leftView: ImageView? = null
     private var rightView: ImageView? = null
     private var animating = false
@@ -71,7 +72,7 @@ class EdgeLightView @JvmOverloads constructor(
         crossinline onEnd: (Animation?) -> Unit = {},
         crossinline onRepeat: (Animation?) -> Unit = {},
     ) {
-        this.setAnimationListener(object : Animation.AnimationListener {
+        setAnimationListener(object : Animation.AnimationListener {
             override fun onAnimationStart(animation: Animation?) = onStart(animation)
             override fun onAnimationEnd(animation: Animation?) = onEnd(animation)
             override fun onAnimationRepeat(animation: Animation?) = onRepeat(animation)
@@ -79,12 +80,15 @@ class EdgeLightView @JvmOverloads constructor(
     }
 
     init {
-        expandAnimation.addListener(onStart = {
-            animating = true
-        }, onEnd = {
-            leftView?.startAnimation(collapseAnimationLeft)
-            rightView?.startAnimation(collapseAnimationRight)
-        })
+        expandAnimation.addListener(
+            onStart = {
+                animating = true
+            },
+            onEnd = {
+                leftView?.startAnimation(collapseAnimationLeft)
+                rightView?.startAnimation(collapseAnimationRight)
+            }
+        )
         collapseAnimationLeft.addListener(onEnd = {
             if (repeatCount == Animation.INFINITE) {
                 leftView?.startAnimation(expandAnimation)
