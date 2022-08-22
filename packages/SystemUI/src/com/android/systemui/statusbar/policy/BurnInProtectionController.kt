@@ -44,9 +44,9 @@ import kotlinx.coroutines.sync.withLock
 class BurnInProtectionController @Inject constructor(
     private val context: Context,
     private val configurationController: ConfigurationController,
+    private val coroutineScope: CoroutineScope
 ) {
 
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
     private val mutex = Mutex()
 
     private val shiftEnabled = context.resources.getBoolean(R.bool.config_statusBarBurnInProtection)

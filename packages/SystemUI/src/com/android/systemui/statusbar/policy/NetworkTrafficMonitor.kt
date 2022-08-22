@@ -61,8 +61,8 @@ class NetworkTrafficMonitor @Inject constructor(
     @Main private val handler: Handler,
     private val wakefulnessLifecycle: WakefulnessLifecycle,
     private val systemSettings: SystemSettings,
+    private val coroutineScope: CoroutineScope
 ) {
-    private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
     private val state = NetworkTrafficState(
         context.getString(com.android.internal.R.string.status_bar_network_traffic),
@@ -219,7 +219,7 @@ class NetworkTrafficMonitor @Inject constructor(
         logD("scheduling job")
         updateRx = false
         state.visible = true
-        trafficUpdateJob = coroutineScope.launch {
+        trafficUpdateJob = coroutineScope.launch(Dispatchers.IO) {
             rxBytesInternal = TrafficStats.getTotalRxBytes()
             txBytesInternal = TrafficStats.getTotalTxBytes()
             timeSinceUpdate = SystemClock.uptimeMillis()

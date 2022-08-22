@@ -100,10 +100,9 @@ class GameSpaceServiceDelegate @Inject constructor(
     private val recordingController: RecordingController,
     private val userContextProvider: UserContextProvider,
     private val privacyDotViewController: PrivacyDotViewController,
+    private val coroutineScope: CoroutineScope,
     context: Context
 ) : SystemUI(context) {
-
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     private val settingsObserver = object : ContentObserver(null) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
