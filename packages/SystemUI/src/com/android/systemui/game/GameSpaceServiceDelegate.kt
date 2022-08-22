@@ -53,6 +53,7 @@ import com.android.systemui.SystemUI
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.keyguard.ScreenLifecycle
+import com.android.systemui.settings.UserTracker
 import com.android.systemui.screenrecord.RecordingController
 import com.android.systemui.screenrecord.RecordingController.RecordingStateChangeCallback
 import com.android.systemui.screenrecord.RecordingService
@@ -101,8 +102,9 @@ class GameSpaceServiceDelegate @Inject constructor(
     private val userContextProvider: UserContextProvider,
     private val privacyDotViewController: PrivacyDotViewController,
     private val coroutineScope: CoroutineScope,
-    context: Context
-) : SystemUI(context) {
+    private val userTracker: UserTracker,
+    context: Context,
+) : SystemUI(context), UserTracker.Callback {
 
     private val settingsObserver = object : ContentObserver(null) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
@@ -560,6 +562,9 @@ class GameSpaceServiceDelegate @Inject constructor(
                 }
             }
         }
+        userTracker.addCallback(this) {
+            it.run()
+        }
         notificationInterruptStateProvider.addSuppressor(notificationInterruptSuppressor)
         registerSettingsObservers(
             Settings.System.GAMESPACE_ENABLED,
@@ -569,6 +574,20 @@ class GameSpaceServiceDelegate @Inject constructor(
             Settings.System.GAMESPACE_DISABLE_FULLSCREEN_INTENT,
             Settings.System.GAMESPACE_HIDE_PRIVACY_INDICATORS
         )
+    }
+
+    override fun onUserChanged(newUser: Int, userContext: Context) {
+        coroutineScope.launch(Dispatchers.IO) {
+            stateMutex.withLock {
+                loadSettingsLocked()
+                if (gameSpaceEnabled) {
+                    registerTaskStackListenerLocked()
+                } else {
+                    unregisterTaskStackListenerLocked()
+                    disableGameModeLocked()
+                }
+            }
+        }
     }
 
     private suspend fun loadSettingsLocked() {
