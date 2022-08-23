@@ -10747,7 +10747,7 @@ public final class Settings {
 
         /**
          * Whether to show privacy indicator for location
-         * Default value is based on it's device config flag
+         * Default to true.
          * @hide
          */
         public static final String ENABLE_LOCATION_PRIVACY_INDICATOR = "enable_location_privacy_indicator";

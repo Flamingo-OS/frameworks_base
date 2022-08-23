@@ -95,8 +95,11 @@ class PrivacyItemController @Inject constructor(
     }
 
     private fun isLocationEnabled(): Boolean {
-        return secureSettings.getIntForUser(Settings.Secure.ENABLE_LOCATION_PRIVACY_INDICATOR,
-            0, UserHandle.USER_CURRENT) == 1
+        return secureSettings.getIntForUser(
+            Settings.Secure.ENABLE_LOCATION_PRIVACY_INDICATOR,
+            1,
+            UserHandle.USER_CURRENT
+        ) == 1
     }
 
     private var currentUserIds = emptyList<Int>()
@@ -119,8 +122,9 @@ class PrivacyItemController @Inject constructor(
     var micCameraAvailable = isMicCameraEnabled()
         private set
     var locationAvailable = isLocationEnabled()
-
+        private set
     var allIndicatorsAvailable = micCameraAvailable && locationAvailable
+        private set
 
     private val devicePropertiesChangedListener =
             object : DeviceConfig.OnPropertiesChangedListener {
@@ -142,12 +146,11 @@ class PrivacyItemController @Inject constructor(
     private val settingsObserver = object : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean) {
             val enabled = isLocationEnabled()
-            if (locationAvailable != enabled) {
-                locationAvailable = enabled
-                allIndicatorsAvailable = micCameraAvailable && locationAvailable
-                callbacks.forEach { it.get()?.onFlagLocationChanged(locationAvailable) }
-                internalUiExecutor.updateListeningState()
-            }
+            if (locationAvailable == enabled) return
+            locationAvailable = enabled
+            allIndicatorsAvailable = micCameraAvailable && locationAvailable
+            callbacks.forEach { it.get()?.onFlagLocationChanged(locationAvailable) }
+            internalUiExecutor.updateListeningState()
         }
     }
 
@@ -175,6 +178,8 @@ class PrivacyItemController @Inject constructor(
     @VisibleForTesting
     internal var userTrackerCallback = object : UserTracker.Callback {
         override fun onUserChanged(newUser: Int, userContext: Context) {
+            locationAvailable = isLocationEnabled()
+            allIndicatorsAvailable = micCameraAvailable && locationAvailable
             update(true)
         }
 
@@ -191,7 +196,7 @@ class PrivacyItemController @Inject constructor(
         dumpManager.registerDumpable(TAG, this)
         secureSettings.registerContentObserverForUser(
             Settings.Secure.ENABLE_LOCATION_PRIVACY_INDICATOR,
-            settingsObserver, UserHandle.USER_CURRENT
+            settingsObserver, UserHandle.USER_ALL
         )
     }
 
