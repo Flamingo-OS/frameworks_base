@@ -30,7 +30,7 @@ import com.android.systemui.R
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.statusbar.StatusBarIconView.STATE_DOT
 import com.android.systemui.statusbar.StatusBarIconView.STATE_ICON
-import com.android.systemui.statusbar.policy.NetworkTrafficMonitor.NetworkTrafficState
+import com.android.systemui.statusbar.policy.NetworkTrafficState
 
 /**
  * Layout class for statusbar network traffic indicator
@@ -40,12 +40,12 @@ class StatusBarNetworkTrafficView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
     defStyleRes: Int = 0,
-): FrameLayout(
-    context,
-    attrs,
-    defStyleAttr,
-    defStyleRes,
-), StatusIconDisplayable {
+) : FrameLayout(
+        context,
+        attrs,
+        defStyleAttr,
+        defStyleRes,
+    ), StatusIconDisplayable {
 
     private var dotView: StatusBarIconView? = null
     private var trafficGroup: FrameLayout? = null
@@ -140,29 +140,34 @@ class StatusBarNetworkTrafficView @JvmOverloads constructor(
 
     private fun initViewState() {
         logD("initViewState")
-        trafficRate?.let {
-            it.setTextSize(COMPLEX_UNIT_PX, state?.size?.toFloat() ?: DEFAULT_TEXT_SIZE)
-            it.text = state?.rate?.toString()
-            it.visibility = if (state?.rateVisible == true) VISIBLE else GONE
+        state?.let {
+            trafficRate?.let { tr ->
+                tr.setTextSize(COMPLEX_UNIT_PX, it.size.toFloat())
+                tr.text = it.rate?.toString()
+                tr.visibility = if (it.rateVisible) VISIBLE else GONE
+            }
+            visibility = if (it.visible) VISIBLE else GONE
         }
-        visibility = if (state?.visible == true) VISIBLE else GONE
     }
 
     override fun toString() = "StatusBarNetworkTrafficView(slot = $slot, state = $state)"
 
     companion object {
         private const val TAG = "StatusBarNetworkTrafficView"
+        private val DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+
         private const val DEFAULT_TEXT_SIZE = 40f
-        private const val DEBUG = false
 
         @JvmStatic
-        fun fromContext(context: Context, slot: String): StatusBarNetworkTrafficView =
-            (LayoutInflater.from(context).inflate(R.layout.status_bar_network_traffic_view,
-                    null) as StatusBarNetworkTrafficView).also {
-                it.slot = slot
-                it.setWidgets()
-                it.visibleState = STATE_ICON
+        fun fromContext(context: Context, slot: String): StatusBarNetworkTrafficView {
+            val layoutInflater = LayoutInflater.from(context)
+            val layout = layoutInflater.inflate(R.layout.status_bar_network_traffic_view, null)
+            return (layout as StatusBarNetworkTrafficView).apply {
+                this.slot = slot
+                setWidgets()
+                visibleState = STATE_ICON
             }
+        }
 
         private fun logD(msg: String) {
             if (DEBUG) Log.d(TAG, msg)

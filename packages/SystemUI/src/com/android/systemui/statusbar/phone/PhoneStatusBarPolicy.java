@@ -70,7 +70,7 @@ import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.statusbar.policy.NetworkTrafficMonitor;
-import com.android.systemui.statusbar.policy.NetworkTrafficMonitor.NetworkTrafficState;
+import com.android.systemui.statusbar.policy.NetworkTrafficState;
 import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.RotationLockController;
 import com.android.systemui.statusbar.policy.RotationLockController.RotationLockControllerCallback;

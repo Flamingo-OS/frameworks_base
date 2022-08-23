@@ -49,7 +49,7 @@ import com.android.systemui.statusbar.StatusIconDisplayable;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.CallIndicatorIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.MobileIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.WifiIconState;
-import com.android.systemui.statusbar.policy.NetworkTrafficMonitor.NetworkTrafficState;
+import com.android.systemui.statusbar.policy.NetworkTrafficState;
 
 import java.util.ArrayList;
 import java.util.List;

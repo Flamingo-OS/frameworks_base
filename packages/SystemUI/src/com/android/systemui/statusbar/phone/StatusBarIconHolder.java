@@ -25,7 +25,7 @@ import com.android.internal.statusbar.StatusBarIcon;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.CallIndicatorIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.MobileIconState;
 import com.android.systemui.statusbar.phone.StatusBarSignalPolicy.WifiIconState;
-import com.android.systemui.statusbar.policy.NetworkTrafficMonitor.NetworkTrafficState;
+import com.android.systemui.statusbar.policy.NetworkTrafficState;
 
 /**
  * Wraps {@link com.android.internal.statusbar.StatusBarIcon} so we can still have a uniform list

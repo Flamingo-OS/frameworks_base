@@ -23,8 +23,8 @@ import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.TrafficStats
 import android.net.Uri
-import android.os.Handler
 import android.os.SystemClock
+import android.os.UserHandle
 import android.provider.Settings
 import android.provider.Settings.System.NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX
 import android.provider.Settings.System.NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX
@@ -38,10 +38,12 @@ import android.util.DataUnit
 import android.util.Log
 import android.util.TypedValue
 
+import androidx.annotation.GuardedBy
+
 import com.android.systemui.R
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.WakefulnessLifecycle
+import com.android.systemui.settings.UserTracker
 import com.android.systemui.util.settings.SystemSettings
 
 import java.text.DecimalFormat
@@ -51,47 +53,52 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 @SysUISingleton
 class NetworkTrafficMonitor @Inject constructor(
-    private val context: Context,
-    @Main private val handler: Handler,
     private val wakefulnessLifecycle: WakefulnessLifecycle,
     private val systemSettings: SystemSettings,
-    private val coroutineScope: CoroutineScope
-) {
+    private val coroutineScope: CoroutineScope,
+    context: Context,
+    userTracker: UserTracker
+) : UserTracker.Callback {
 
-    private val state = NetworkTrafficState(
-        context.getString(com.android.internal.R.string.status_bar_network_traffic),
-        SpannableString("0" + LINE_SEPARATOR + units[0]),
-    )
-    private val settingsObserver: SettingsObserver
+    private val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+
+    private val stateMutex = Mutex()
+
+    @GuardedBy("stateMutex")
+    private val state = NetworkTrafficState()
     private val callbacks = mutableSetOf<Callback>()
 
-    private val defaultTextSize: Int
+    private val defaultTextSize = context.resources.getDimension(
+        R.dimen.network_traffic_unit_text_default_size
+    ).toInt()
     private val defaultScaleFactor: Float
 
     private var trafficUpdateJob: Job? = null
-    private var timeSinceUpdate = 1L
 
-    // To keep track of total number of bytes
-    private var rxBytesInternal: Long = 0
-    private var txBytesInternal: Long = 0
-
-    // For dynamic mode, transitions between true and false for each tick
-    private var updateRx = false
+    private val settingsMutex = Mutex()
 
     // Threshold value in KiB/S
+    @GuardedBy("settingsMutex")
     private var txThreshold: Long = 0
+    @GuardedBy("settingsMutex")
     private var rxThreshold: Long = 0
 
     // Whether traffic monitor is enabled
+    @GuardedBy("settingsMutex")
     private var enabled = false
 
     // RelativeSizeSpan for network traffic rate text
+    @GuardedBy("settingsMutex")
     private var rsp: RelativeSizeSpan
 
     // Whether external callbacks and observers are registered
@@ -104,8 +111,42 @@ class NetworkTrafficMonitor @Inject constructor(
     // in this state
     private var isDozing = false
 
+    private val settingsObserver = object : ContentObserver(null) {
+        override fun onChange(selfChange: Boolean, uri: Uri) {
+            logD("settings changed for $uri")
+            coroutineScope.launch {
+                when (uri.lastPathSegment) {
+                    NETWORK_TRAFFIC_ENABLED -> {
+                        settingsMutex.withLock {
+                            updateEnabledStateLocked()
+                            notifyCallbacks()
+                        }
+                    }
+                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX -> settingsMutex.withLock {
+                        updateTxAutoHideThresholdLocked()
+                    }
+                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX -> settingsMutex.withLock {
+                        updateRxAutoHideThresholdLocked()
+                    }
+                    NETWORK_TRAFFIC_UNIT_TEXT_SIZE -> {
+                        stateMutex.withLock {
+                            updateUnitTextSizeLocked()
+                            notifyCallbacksLocked()
+                        }
+                    }
+                    NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR -> {
+                        settingsMutex.withLock {
+                            updateRateTextScaleLocked()
+                        }
+                        notifyCallbacks()
+                    }
+                }
+            }
+        }
+    }
+
     // To schedule / unschedule task based on connectivity
-    private val networkCallback = object: NetworkCallback() {
+    private val networkCallback = object : NetworkCallback() {
         override fun onAvailable(network: Network) {
             logD("onAvailable")
             networkAvailable = true
@@ -120,7 +161,7 @@ class NetworkTrafficMonitor @Inject constructor(
     }
 
     // To kill / start the timer thread if device is going to sleep / waking up
-    private val wakefulnessObserver = object: WakefulnessLifecycle.Observer {
+    private val wakefulnessObserver = object : WakefulnessLifecycle.Observer {
         override fun onStartedGoingToSleep() {
             logD("onStartedGoingToSleep")
             isDozing = true
@@ -135,15 +176,15 @@ class NetworkTrafficMonitor @Inject constructor(
     }
 
     init {
-        val res = context.resources
-        defaultTextSize = res.getDimension(R.dimen.network_traffic_unit_text_default_size).toInt()
         val typedValue = TypedValue()
-        res.getValue(R.dimen.network_traffic_rate_text_default_scale_factor, typedValue, true)
+        context.resources.getValue(
+            R.dimen.network_traffic_rate_text_default_scale_factor,
+            typedValue,
+            true
+        )
         defaultScaleFactor = typedValue.float
         rsp = RelativeSizeSpan(defaultScaleFactor)
-        settingsObserver = SettingsObserver().also {
-            it.update()
-        }
+        loadSettings()
         register(
             NETWORK_TRAFFIC_ENABLED,
             NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX,
@@ -151,12 +192,105 @@ class NetworkTrafficMonitor @Inject constructor(
             NETWORK_TRAFFIC_UNIT_TEXT_SIZE,
             NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR
         )
+        userTracker.addCallback(this) {
+            it.run()
+        }
     }
 
     private fun register(vararg keys: String) {
         keys.forEach {
-            systemSettings.registerContentObserver(it, settingsObserver)
+            systemSettings.registerContentObserverForUser(
+                it,
+                settingsObserver,
+                UserHandle.USER_ALL
+            )
         }
+    }
+
+    override fun onUserChanged(newUser: Int, userContext: Context) {
+        loadSettings()
+    }
+
+    private fun loadSettings() {
+        coroutineScope.launch {
+            settingsMutex.withLock {
+                updateEnabledStateLocked()
+                updateTxAutoHideThresholdLocked()
+                updateRxAutoHideThresholdLocked()
+                stateMutex.withLock {
+                    updateUnitTextSizeLocked()
+                }
+                updateRateTextScaleLocked()
+            }
+        }
+    }
+
+    @GuardedBy("settingsMutex")
+    private suspend fun updateEnabledStateLocked() {
+        enabled = withContext(Dispatchers.IO) {
+            systemSettings.getIntForUser(NETWORK_TRAFFIC_ENABLED, 0, UserHandle.USER_CURRENT) == 1
+        }
+        logD("enabled = $enabled")
+        if (enabled) {
+            register()
+        } else {
+            unregister()
+            cancelScheduledJob()
+        }
+    }
+
+    @GuardedBy("settingsMutex")
+    private suspend fun updateTxAutoHideThresholdLocked() {
+        txThreshold = withContext(Dispatchers.IO) {
+            DataUnit.KIBIBYTES.toBytes(
+                systemSettings.getLongForUser(
+                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX,
+                    0,
+                    UserHandle.USER_CURRENT
+                )
+            )
+        }
+        logD("txThreshold = $txThreshold")
+    }
+
+    @GuardedBy("settingsMutex")
+    private suspend fun updateRxAutoHideThresholdLocked() {
+        rxThreshold = withContext(Dispatchers.IO) {
+            DataUnit.KIBIBYTES.toBytes(
+                systemSettings.getLongForUser(
+                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX,
+                    0,
+                    UserHandle.USER_CURRENT
+                )
+            )
+        }
+        logD("rxThreshold = $rxThreshold")
+    }
+
+    @GuardedBy("stateMutex")
+    private suspend fun updateUnitTextSizeLocked() {
+        state.size = withContext(Dispatchers.IO) {
+            systemSettings.getIntForUser(
+                NETWORK_TRAFFIC_UNIT_TEXT_SIZE,
+                defaultTextSize,
+                UserHandle.USER_CURRENT
+            )
+        }
+        logD("defaultTextSize = $defaultTextSize, size = ${state.size}")
+        notifyCallbacksLocked()
+    }
+
+    @GuardedBy("settingsMutex")
+    private suspend fun updateRateTextScaleLocked() {
+        val scaleFactor = withContext(Dispatchers.IO) {
+            systemSettings.getIntForUser(
+                NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR,
+                (defaultScaleFactor * 10).toInt(),
+                UserHandle.USER_CURRENT
+            ) / 10f
+        }
+        logD("scaleFactor = $scaleFactor")
+        rsp = RelativeSizeSpan(scaleFactor)
     }
 
     /**
@@ -180,27 +314,32 @@ class NetworkTrafficMonitor @Inject constructor(
         callbacks.remove(callback)
     }
 
-    private fun notifyCallbacks() {
+    private suspend fun notifyCallbacks() {
+        stateMutex.withLock {
+            notifyCallbacksLocked()
+        }
+    }
+
+    @GuardedBy("stateMutex")
+    private suspend fun notifyCallbacksLocked() {
         logD("notifying callbacks about new state = $state")
-        callbacks.forEach { it.onTrafficUpdate(state) }
+        withContext(Dispatchers.Main) {
+            callbacks.forEach { it.onTrafficUpdate(state) }
+        }
     }
 
     private fun register() {
-        if (!registered) {
-            registered = true
-            context.getSystemService(ConnectivityManager::class.java)
-                .registerDefaultNetworkCallback(networkCallback)
-            wakefulnessLifecycle.addObserver(wakefulnessObserver)
-        }
+        if (registered) return
+        connectivityManager.registerDefaultNetworkCallback(networkCallback)
+        wakefulnessLifecycle.addObserver(wakefulnessObserver)
+        registered = true
     }
 
     private fun unregister() {
-        if (registered) {
-            registered = false
-            context.getSystemService(ConnectivityManager::class.java)
-                .unregisterNetworkCallback(networkCallback)
-            wakefulnessLifecycle.removeObserver(wakefulnessObserver)
-        }
+        if (!registered) return
+        connectivityManager.unregisterNetworkCallback(networkCallback)
+        wakefulnessLifecycle.removeObserver(wakefulnessObserver)
+        registered = false
     }
 
     private fun scheduleJob() {
@@ -217,16 +356,14 @@ class NetworkTrafficMonitor @Inject constructor(
             return
         }
         logD("scheduling job")
-        updateRx = false
-        state.visible = true
-        trafficUpdateJob = coroutineScope.launch(Dispatchers.IO) {
-            rxBytesInternal = TrafficStats.getTotalRxBytes()
-            txBytesInternal = TrafficStats.getTotalTxBytes()
-            timeSinceUpdate = SystemClock.uptimeMillis()
-            delay(1000)
-            while (isActive) {
-                updateAndDispatchState()
-                delay(1000)
+        trafficUpdateJob = createNewJob().also {
+            it.invokeOnCompletion {
+                coroutineScope.launch {
+                    stateMutex.withLock {
+                        state.visible = false
+                        notifyCallbacksLocked()
+                    }
+                }
             }
         }
     }
@@ -238,37 +375,51 @@ class NetworkTrafficMonitor @Inject constructor(
         }
         logD("Cancelling job")
         trafficUpdateJob?.cancel()
-        state.visible = false
-        handler.post(this::notifyCallbacks)
         trafficUpdateJob = null
     }
 
-    private fun updateAndDispatchState() {
-        updateRx = !updateRx
-        val rxBytes = TrafficStats.getTotalRxBytes()
-        val txBytes = TrafficStats.getTotalTxBytes()
-        val duration = SystemClock.uptimeMillis() - timeSinceUpdate
-        val rxTrans = ((rxBytes - rxBytesInternal) * 1000) / duration
-        val txTrans = ((txBytes - txBytesInternal) * 1000) / duration
-        logD("rxBytes = $rxBytes, rxBytesInternal = $rxBytesInternal" +
-                ", rxTrans = $rxTrans, rxThreshold = $rxThreshold")
-        logD("txBytes = $txBytes, txBytesInternal = $txBytesInternal" +
-                ", txTrans = $txTrans, txThreshold = $txThreshold")
-        rxBytesInternal = rxBytes
-        txBytesInternal = txBytes
-        if (rxTrans >= rxThreshold && txTrans >= txThreshold) { // Show iff both thresholds are met
-            logD("threshold is met, showing")
-            state.rateVisible = true
-            updateRateFormatted(if (updateRx) rxTrans else txTrans)
-        } else {
-            logD("threshold is not met, hiding")
-            state.rateVisible = false
+    private fun createNewJob(): Job {
+        return coroutineScope.launch(Dispatchers.IO) {
+            stateMutex.withLock {
+                state.visible = true
+            }
+            var currentRxBytes = TrafficStats.getTotalRxBytes()
+            var currentTxBytes = TrafficStats.getTotalTxBytes()
+            var lastUpdateTime = SystemClock.uptimeNanos()
+            var updateRx = true
+            do {
+                logD("updateRx = $updateRx")
+                val rxBytes = TrafficStats.getTotalRxBytes()
+                val txBytes = TrafficStats.getTotalTxBytes()
+                val duration = SystemClock.uptimeNanos() - lastUpdateTime
+                val rxTrans = ((rxBytes - currentRxBytes) * NANO_SEC) / duration
+                val txTrans = ((txBytes - currentTxBytes) * NANO_SEC) / duration
+                logD("rxBytes = $rxBytes, currentRxBytes = $currentRxBytes" +
+                        ", rxTrans = $rxTrans, rxThreshold = $rxThreshold")
+                logD("txBytes = $txBytes, currentTxBytes = $currentTxBytes" +
+                        ", txTrans = $txTrans, txThreshold = $txThreshold")
+                currentRxBytes = rxBytes
+                currentTxBytes = txBytes
+                stateMutex.withLock {
+                    val thresholdMet = rxTrans >= rxThreshold && txTrans >= txThreshold // Show iff both thresholds are met
+                    logD("thresholdMet = $thresholdMet")
+                    state.rateVisible = thresholdMet
+                    if (thresholdMet) {
+                        settingsMutex.withLock {
+                            state.rate = getRateFormatted(if (updateRx) rxTrans else txTrans)
+                        }
+                    }
+                    notifyCallbacksLocked()
+                }
+                lastUpdateTime = SystemClock.uptimeNanos()
+                updateRx = !updateRx
+                delay(1000)
+            } while (isActive)
         }
-        handler.post(this::notifyCallbacks)
-        timeSinceUpdate = SystemClock.uptimeMillis()
     }
 
-    private fun updateRateFormatted(bytes: Long) {
+    @GuardedBy("settingsMutex")
+    private fun getRateFormatted(bytes: Long): SpannableString {
         var unit: String
         var rateString: String
         var rate: Float = bytes / KiB.toFloat()
@@ -276,94 +427,19 @@ class NetworkTrafficMonitor @Inject constructor(
         while (true) {
             rate /= KiB
             if (rate >= 0.9f && rate < 1) {
-                unit = units[i + 1]
+                unit = Units[i + 1]
                 break
             } else if (rate < 0.9) {
                 rate *= KiB
-                unit = units[i]
+                unit = Units[i]
                 break
             }
             i++
         }
         rateString = getFormattedString(rate)
         logD("bytes = $bytes, rate = $rate, rateString = $rateString, unit = $unit")
-        state.rate = SpannableString(rateString + LINE_SEPARATOR + unit).also {
+        return SpannableString(rateString + LINE_SEPARATOR + unit).also {
             it.setSpan(rsp, 0, rateString.length, 0)
-        }
-    }
-
-    /**
-     * Class holding relevant information for the view in
-     * StatusBar to update or instantiate from.
-     */
-    data class NetworkTrafficState(
-        var slot: String? = null,
-        var rate: Spanned? = null,
-        var size: Int = 0,
-        @JvmField var visible: Boolean = false,
-        var rateVisible: Boolean = true,
-    ) {
-        fun copy() = NetworkTrafficState(slot, rate, size, visible, rateVisible)
-    }
-
-    private inner class SettingsObserver: ContentObserver(handler) {
-        override fun onChange(selfChange: Boolean, uri: Uri) {
-            logD("settings changed for $uri")
-            when (uri.lastPathSegment) {
-                NETWORK_TRAFFIC_ENABLED -> {
-                    updateEnabledState()
-                    notifyCallbacks()
-                }
-                NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX -> updateTxAutoHideThreshold()
-                NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX -> updateRxAutoHideThreshold()
-                NETWORK_TRAFFIC_UNIT_TEXT_SIZE -> updateUnitTextSize()
-                NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR -> updateRateTextScale()
-            }
-        }
-
-        fun update() {
-            updateEnabledState()
-            updateTxAutoHideThreshold()
-            updateRxAutoHideThreshold()
-            updateUnitTextSize()
-            updateRateTextScale()
-        }
-
-        private fun updateEnabledState() {
-            enabled = systemSettings.getInt(NETWORK_TRAFFIC_ENABLED, 0) == 1
-            logD("enabled = $enabled")
-            if (enabled) {
-                register()
-            } else {
-                unregister()
-                cancelScheduledJob()
-            }
-        }
-
-        private fun updateTxAutoHideThreshold() {
-            txThreshold = DataUnit.KIBIBYTES.toBytes(systemSettings.getLong(
-                NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX, 0))
-            logD("txThreshold = $txThreshold")
-        }
-
-        private fun updateRxAutoHideThreshold() {
-            rxThreshold = DataUnit.KIBIBYTES.toBytes(systemSettings.getLong(
-                NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX, 0))
-            logD("rxThreshold = $rxThreshold")
-        }
-
-        private fun updateUnitTextSize() {
-            state.size = systemSettings.getInt(NETWORK_TRAFFIC_UNIT_TEXT_SIZE,
-                defaultTextSize)
-            logD("defaultTextSize = $defaultTextSize, size = ${state.size}")
-            notifyCallbacks()
-        }
-
-        private fun updateRateTextScale() {
-            val scaleFactor = systemSettings.getInt(NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR,
-                (defaultScaleFactor * 10).toInt()) / 10f
-            logD("scaleFactor = $scaleFactor")
-            rsp = RelativeSizeSpan(scaleFactor)
         }
     }
 
@@ -383,18 +459,21 @@ class NetworkTrafficMonitor @Inject constructor(
 
     companion object {
         private const val TAG = "NetworkTrafficMonitor"
-        private const val LINE_SEPARATOR = "\n"
-        private const val DEBUG = false
+        private val DEBUG = Log.isLoggable(TAG, Log.DEBUG)
 
-        private val units = arrayOf("KiB/s", "MiB/s", "GiB/s")
-        private val singleDecimalFmt = DecimalFormat("00.0")
-        private val doubleDecimalFmt = DecimalFormat("0.00")
+        private const val LINE_SEPARATOR = "\n"
+
+        private const val NANO_SEC = 1000 * 1000 * 1000
+
+        private val Units = arrayOf("KiB/s", "MiB/s", "GiB/s")
+        private val SingleDecimalFmt = DecimalFormat("00.0")
+        private val DoubleDecimalFmt = DecimalFormat("0.00")
         private val KiB: Long = DataUnit.KIBIBYTES.toBytes(1)
 
         private fun getFormattedString(rate: Float) =
             when {
-                rate < 10 -> doubleDecimalFmt.format(rate)
-                rate < 100 -> singleDecimalFmt.format(rate)
+                rate < 10 -> DoubleDecimalFmt.format(rate)
+                rate < 100 -> SingleDecimalFmt.format(rate)
                 rate < 1000 -> rate.toInt().toString()
                 else -> rate.toString()
             }
@@ -404,3 +483,14 @@ class NetworkTrafficMonitor @Inject constructor(
         }
     }
 }
+
+/**
+ * Class holding relevant information for the view in
+ * StatusBar to update or instantiate from.
+ */
+data class NetworkTrafficState(
+    var rate: Spanned? = null,
+    var size: Int = 0,
+    @JvmField var visible: Boolean = false,
+    var rateVisible: Boolean = true,
+)
