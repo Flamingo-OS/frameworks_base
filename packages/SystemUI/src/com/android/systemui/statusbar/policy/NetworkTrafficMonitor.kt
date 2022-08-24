@@ -85,20 +85,18 @@ class NetworkTrafficMonitor @Inject constructor(
 
     private var trafficUpdateJob: Job? = null
 
-    private val settingsMutex = Mutex()
-
     // Threshold value in KiB/S
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private var txThreshold: Long = 0
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private var rxThreshold: Long = 0
 
     // Whether traffic monitor is enabled
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private var enabled = false
 
     // RelativeSizeSpan for network traffic rate text
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private var rsp: RelativeSizeSpan
 
     // Whether external callbacks and observers are registered
@@ -115,30 +113,22 @@ class NetworkTrafficMonitor @Inject constructor(
         override fun onChange(selfChange: Boolean, uri: Uri) {
             logD("settings changed for $uri")
             coroutineScope.launch {
-                when (uri.lastPathSegment) {
-                    NETWORK_TRAFFIC_ENABLED -> {
-                        settingsMutex.withLock {
+                stateMutex.withLock {
+                    when (uri.lastPathSegment) {
+                        NETWORK_TRAFFIC_ENABLED -> {
                             updateEnabledStateLocked()
-                            notifyCallbacks()
+                            notifyCallbacksLocked()
                         }
-                    }
-                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX -> settingsMutex.withLock {
-                        updateTxAutoHideThresholdLocked()
-                    }
-                    NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX -> settingsMutex.withLock {
-                        updateRxAutoHideThresholdLocked()
-                    }
-                    NETWORK_TRAFFIC_UNIT_TEXT_SIZE -> {
-                        stateMutex.withLock {
+                        NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_TX -> updateTxAutoHideThresholdLocked()
+                        NETWORK_TRAFFIC_AUTO_HIDE_THRESHOLD_RX -> updateRxAutoHideThresholdLocked()
+                        NETWORK_TRAFFIC_UNIT_TEXT_SIZE -> {
                             updateUnitTextSizeLocked()
                             notifyCallbacksLocked()
                         }
-                    }
-                    NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR -> {
-                        settingsMutex.withLock {
+                        NETWORK_TRAFFIC_RATE_TEXT_SCALE_FACTOR -> {
                             updateRateTextScaleLocked()
+                            notifyCallbacksLocked()
                         }
-                        notifyCallbacks()
                     }
                 }
             }
@@ -213,19 +203,17 @@ class NetworkTrafficMonitor @Inject constructor(
 
     private fun loadSettings() {
         coroutineScope.launch {
-            settingsMutex.withLock {
+            stateMutex.withLock {
                 updateEnabledStateLocked()
                 updateTxAutoHideThresholdLocked()
                 updateRxAutoHideThresholdLocked()
-                stateMutex.withLock {
-                    updateUnitTextSizeLocked()
-                }
+                updateUnitTextSizeLocked()
                 updateRateTextScaleLocked()
             }
         }
     }
 
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private suspend fun updateEnabledStateLocked() {
         enabled = withContext(Dispatchers.IO) {
             systemSettings.getIntForUser(NETWORK_TRAFFIC_ENABLED, 0, UserHandle.USER_CURRENT) == 1
@@ -239,7 +227,7 @@ class NetworkTrafficMonitor @Inject constructor(
         }
     }
 
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private suspend fun updateTxAutoHideThresholdLocked() {
         txThreshold = withContext(Dispatchers.IO) {
             DataUnit.KIBIBYTES.toBytes(
@@ -253,7 +241,7 @@ class NetworkTrafficMonitor @Inject constructor(
         logD("txThreshold = $txThreshold")
     }
 
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private suspend fun updateRxAutoHideThresholdLocked() {
         rxThreshold = withContext(Dispatchers.IO) {
             DataUnit.KIBIBYTES.toBytes(
@@ -280,7 +268,7 @@ class NetworkTrafficMonitor @Inject constructor(
         notifyCallbacksLocked()
     }
 
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private suspend fun updateRateTextScaleLocked() {
         val scaleFactor = withContext(Dispatchers.IO) {
             systemSettings.getIntForUser(
@@ -405,9 +393,7 @@ class NetworkTrafficMonitor @Inject constructor(
                     logD("thresholdMet = $thresholdMet")
                     state.rateVisible = thresholdMet
                     if (thresholdMet) {
-                        settingsMutex.withLock {
-                            state.rate = getRateFormatted(if (updateRx) rxTrans else txTrans)
-                        }
+                        state.rate = getRateFormatted(if (updateRx) rxTrans else txTrans)
                     }
                     notifyCallbacksLocked()
                 }
@@ -418,7 +404,7 @@ class NetworkTrafficMonitor @Inject constructor(
         }
     }
 
-    @GuardedBy("settingsMutex")
+    @GuardedBy("stateMutex")
     private fun getRateFormatted(bytes: Long): SpannableString {
         var unit: String
         var rateString: String
