@@ -36,8 +36,8 @@ import com.android.systemui.plugins.qs.QSTile;
 import com.android.systemui.qs.customize.QSCustomizerController;
 import com.android.systemui.qs.dagger.QSScope;
 import com.android.systemui.qs.logging.QSLogger;
-import com.android.systemui.settings.brightness.BrightnessMirrorHandler;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController;
+import com.android.systemui.settings.brightness.BrightnessMirrorHandler;
 import com.android.systemui.util.settings.SystemSettings;
 
 import java.util.ArrayList;
@@ -58,7 +58,6 @@ public class QuickQSPanelController extends QSPanelControllerBase<QuickQSPanel> 
                 }
             };
 
-    // brightness is visible only in split shade
     private final QuickQSBrightnessController mBrightnessController;
     private final BrightnessMirrorHandler mBrightnessMirrorHandler;
     private final FooterActionsController mFooterActionsController;

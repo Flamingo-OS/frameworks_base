@@ -3409,7 +3409,7 @@ public final class BluetoothAdapter {
         Class<?> broadcastClass = null;
         Method broadcastClose = null;
         try {
-            broadcastClass = Class.forName("android.bluetooth.BluetootBroadcast");
+            broadcastClass = Class.forName("android.bluetooth.BluetoothBroadcast");
         } catch (ClassNotFoundException ex) {
             Log.e(TAG, "no BluetoothBroadcast: exists");
         }
