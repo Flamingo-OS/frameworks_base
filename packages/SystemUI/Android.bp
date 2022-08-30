@@ -73,6 +73,7 @@ android_library {
         "src/**/*.java",
         "src/**/I*.aidl",
         ":ReleaseJavaFiles",
+        ":FlamingoSystemUI_src",
     ],
     product_variables: {
         debuggable: {
@@ -84,6 +85,9 @@ android_library {
         "res-product",
         "res-keyguard",
         "res",
+    ],
+    resource_zips: [
+        ":FlamingoSystemUI_res",
     ],
     static_libs: [
         "WifiTrackerLib",
@@ -109,6 +113,8 @@ android_library {
         "androidx.arch.core_core-runtime",
         "androidx.lifecycle_lifecycle-common-java8",
         "androidx.lifecycle_lifecycle-extensions",
+        "androidx.lifecycle_lifecycle-runtime-ktx",
+        "androidx.lifecycle_lifecycle-service",
         "androidx.dynamicanimation_dynamicanimation",
         "androidx-constraintlayout_constraintlayout",
         "androidx.exifinterface_exifinterface",
@@ -122,8 +128,13 @@ android_library {
         "dagger2",
         "jsr330",
         "lottie",
+        "colorkt",
+        "themelib",
     ],
     manifest: "AndroidManifest.xml",
+    additional_manifests: [
+        ":FlamingoSystemUI_manifest",
+    ],
     defaults: [
        "framework-wifi-vendor-hide-access-defaults",
     ],
@@ -283,11 +294,17 @@ systemui_optimized_java_defaults {
                 enabled: true,
                 optimize: true,
                 shrink: true,
-                proguard_flags_files: ["proguard.flags"],
+                proguard_flags_files: [
+                    "proguard.flags",
+                    ":FlamingoSystemUI_proguard_flags",
+                ],
             },
             conditions_default: {
                 optimize: {
-                    proguard_flags_files: ["proguard.flags"],
+                    proguard_flags_files: [
+                        "proguard.flags",
+                        ":FlamingoSystemUI_proguard_flags",
+                    ],
                 },
             },
         },
@@ -322,5 +339,6 @@ android_app {
     dxflags: ["--multi-dex"],
     required: [
         "privapp_whitelist_com.android.systemui",
+        "privapp_permissions_systemui_flamingo",
     ],
 }
