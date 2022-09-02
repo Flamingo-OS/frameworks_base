@@ -50,17 +50,22 @@ import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.UserHandle;
+import android.os.VibrationEffect;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -94,12 +99,16 @@ import com.android.settingslib.applications.InterestingConfigChanges;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastSender;
 import com.android.systemui.clipboardoverlay.ClipboardOverlayController;
+import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.screenshot.ScreenshotController.SavedImageData.ActionTransition;
 import com.android.systemui.screenshot.TakeScreenshotService.RequestCallback;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.util.Assert;
+import com.android.systemui.util.RingerModeTracker;
+import com.android.systemui.util.settings.SystemSettings;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -248,6 +257,9 @@ public class ScreenshotController {
 
     private static final int SCREENSHOT_CORNER_DEFAULT_TIMEOUT_MILLIS = 6000;
 
+    private static final VibrationEffect SCREENSHOT_VIBE_EFFECT =
+        VibrationEffect.createPredefined(VibrationEffect.EFFECT_THUD);
+
     private final WindowContext mContext;
     private final ScreenshotNotificationsController mNotificationsController;
     private final ScreenshotSmartActions mScreenshotSmartActions;
@@ -256,6 +268,9 @@ public class ScreenshotController {
     private final Executor mMainExecutor;
     private final ExecutorService mBgExecutor;
     private final BroadcastSender mBroadcastSender;
+    private final RingerModeTracker mRingerModeTracker;
+    private final VibratorHelper mVibratorHelper;
+    private final SystemSettings mSystemSettings;
 
     private final WindowManager mWindowManager;
     private final WindowManager.LayoutParams mWindowLayoutParams;
@@ -307,6 +322,9 @@ public class ScreenshotController {
         }
     };
 
+    private final ContentObserver mSettingsObserver;
+    private boolean mPlayScreenshotSound;
+
     private String getForegroundAppLabel() {
         if (mTaskComponentName == null) return null;
         try {
@@ -330,7 +348,11 @@ public class ScreenshotController {
             LongScreenshotData longScreenshotHolder,
             ActivityManager activityManager,
             TimeoutHandler timeoutHandler,
-            BroadcastSender broadcastSender) {
+            BroadcastSender broadcastSender,
+            RingerModeTracker ringerModeTracker,
+            VibratorHelper vibratorHelper,
+            @Background Handler backgroundHandler,
+            SystemSettings systemSettings) {
         mScreenshotSmartActions = screenshotSmartActions;
         mNotificationsController = screenshotNotificationsController;
         mScrollCaptureClient = scrollCaptureClient;
@@ -342,6 +364,24 @@ public class ScreenshotController {
         mIsLowRamDevice = activityManager.isLowRamDevice();
         mBgExecutor = Executors.newSingleThreadExecutor();
         mBroadcastSender = broadcastSender;
+        mRingerModeTracker = ringerModeTracker;
+        mVibratorHelper = vibratorHelper;
+        mSystemSettings = systemSettings;
+
+        mSettingsObserver = new ContentObserver(backgroundHandler) {
+            @Override
+            public void onChange(boolean selfChange) {
+                updateSettings();
+            }
+        };
+        backgroundHandler.post(() -> {
+            updateSettings();
+        });
+        mSystemSettings.registerContentObserverForUser(
+            Settings.System.SCREENSHOT_SHUTTER_SOUND,
+            mSettingsObserver,
+            UserHandle.USER_ALL
+        );
 
         mScreenshotHandler = timeoutHandler;
         mScreenshotHandler.setDefaultTimeoutMillis(SCREENSHOT_CORNER_DEFAULT_TIMEOUT_MILLIS);
@@ -394,6 +434,14 @@ public class ScreenshotController {
 
         // Initialize current foreground package name
         mTaskListener.onTaskStackChanged();
+    }
+
+    private void updateSettings() {
+        final boolean playScreenshotSound = mSystemSettings.getIntForUser(
+            Settings.System.SCREENSHOT_SHUTTER_SOUND, 1, UserHandle.USER_CURRENT) == 1;
+        mMainExecutor.execute(() -> {
+            mPlayScreenshotSound = playScreenshotSound;
+        });
     }
 
     @MainThread
@@ -480,6 +528,7 @@ public class ScreenshotController {
 
     // Any cleanup needed when the service is being destroyed.
     void onDestroy() {
+        mSystemSettings.unregisterContentObserver(mSettingsObserver);
         removeWindow();
         releaseMediaPlayer();
         releaseContext();
@@ -893,15 +942,26 @@ public class ScreenshotController {
     }
 
     private void playCameraSound() {
-        mCameraSound.addListener(() -> {
-            try {
-                MediaPlayer player = mCameraSound.get();
-                if (player != null) {
-                    player.start();
-                }
-            } catch (InterruptedException | ExecutionException e) {
-            }
-        }, mBgExecutor);
+        switch (mRingerModeTracker.getRingerMode().getValue()) {
+            case AudioManager.RINGER_MODE_SILENT:
+                // do nothing
+                return;
+            case AudioManager.RINGER_MODE_VIBRATE:
+                mVibratorHelper.vibrate(SCREENSHOT_VIBE_EFFECT);
+                return;
+            default:
+                if (!mPlayScreenshotSound) return;
+                // Play the shutter sound to notify that we've taken a screenshot
+                mCameraSound.addListener(() -> {
+                    try {
+                        MediaPlayer player = mCameraSound.get();
+                        if (player != null) {
+                            player.start();
+                        }
+                    } catch (InterruptedException | ExecutionException e) {
+                    }
+                }, mBgExecutor);
+        }
     }
 
     /**
