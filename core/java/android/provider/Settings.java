@@ -11309,6 +11309,13 @@ public final class Settings {
         public static final String LAUNCHER_HIDDEN_APPS = "launcher_hidden_apps";
 
         /**
+         * Whether to enable combined signal icons.
+         * Default false.
+         * @hide
+         */
+        public static final String COMBINED_STATUS_BAR_SIGNAL_ICONS = "combined_status_bar_signal_icons";
+
+        /**
          * These entries are considered common between the personal and the managed profile,
          * since the managed profile doesn't get to change them.
          */
