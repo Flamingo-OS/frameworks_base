@@ -28,22 +28,18 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.database.ContentObserver;
 import android.graphics.Point;
 import android.hardware.biometrics.BiometricFingerprintConstants;
 import android.hardware.display.DisplayManager;
 import android.hardware.fingerprint.FingerprintManager;
 import android.hardware.fingerprint.IUdfpsOverlayController;
 import android.hardware.fingerprint.IUdfpsOverlayControllerCallback;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.Trace;
-import android.os.UserHandle;
 import android.os.VibrationAttributes;
 import android.os.VibrationEffect;
-import android.provider.Settings;
 import android.util.BoostFramework;
 import android.util.Log;
 import android.util.RotationUtils;
@@ -60,7 +56,6 @@ import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.biometrics.dagger.BiometricsBackground;
 import com.android.systemui.dagger.SysUISingleton;
-import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.doze.DozeReceiver;
 import com.android.systemui.dump.DumpManager;
@@ -77,7 +72,6 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.concurrency.Execution;
-import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.SystemClock;
 
 import java.util.HashSet;
@@ -172,8 +166,6 @@ public class UdfpsController implements DozeReceiver {
     private boolean mOnFingerDown;
     private boolean mAttemptedToDismissKeyguard;
     private final Set<Callback> mCallbacks = new HashSet<>();
-    private final SystemSettings mSystemSettings;
-    private boolean mUdfpsStartHapticFeedbackEnabled = true;
 
     // Boostframework for UDFPS
     private BoostFramework mPerf = null;
@@ -623,9 +615,7 @@ public class UdfpsController implements DozeReceiver {
             @NonNull LatencyTracker latencyTracker,
             @NonNull ActivityLaunchAnimator activityLaunchAnimator,
             @NonNull Optional<AlternateUdfpsTouchProvider> aternateTouchProvider,
-            @BiometricsBackground Executor biometricsExecutor,
-            @NonNull SystemSettings systemSettings,
-            @NonNull @Background Handler backgroundHandler) {
+            @BiometricsBackground Executor biometricsExecutor) {
         mContext = context;
         mExecution = execution;
         mVibrator = vibrator;
@@ -679,32 +669,7 @@ public class UdfpsController implements DozeReceiver {
 
         udfpsHapticsSimulator.setUdfpsController(this);
         udfpsShell.setUdfpsOverlayController(mUdfpsOverlayController);
-        mSystemSettings = systemSettings;
-        backgroundHandler.post(() -> {
-            final boolean isEnabled = isUdfpsStartHapticFeedbackEnabled();
-            mainHandler.post(() -> {
-                mUdfpsStartHapticFeedbackEnabled = isEnabled;
-            });
-        });
-        final ContentObserver settingsObserver = new ContentObserver(backgroundHandler) {
-            @Override
-            public void onChange(boolean selfChange, Uri uri) {
-                if (uri.getLastPathSegment() == Settings.System.ENABLE_UDFPS_START_HAPTIC_FEEDBACK) {
-                    final boolean isEnabled = isUdfpsStartHapticFeedbackEnabled();
-                    mainHandler.post(() -> {
-                        mUdfpsStartHapticFeedbackEnabled = isEnabled;
-                    });
-                }
-            }
-        };
-        mSystemSettings.registerContentObserverForUser(Settings.System.ENABLE_UDFPS_START_HAPTIC_FEEDBACK,
-            settingsObserver, UserHandle.USER_ALL);
         mPerf = new BoostFramework();
-    }
-
-    private boolean isUdfpsStartHapticFeedbackEnabled() {
-        return mSystemSettings.getIntForUser(
-            Settings.System.ENABLE_UDFPS_START_HAPTIC_FEEDBACK, 1, UserHandle.USER_CURRENT) == 1;
     }
 
     /**
@@ -712,7 +677,7 @@ public class UdfpsController implements DozeReceiver {
      */
     @VisibleForTesting
     public void playStartHaptic() {
-        if (mAccessibilityManager.isTouchExplorationEnabled() && mUdfpsStartHapticFeedbackEnabled) {
+        if (mAccessibilityManager.isTouchExplorationEnabled()) {
             mVibrator.vibrate(
                     Process.myUid(),
                     mContext.getOpPackageName(),

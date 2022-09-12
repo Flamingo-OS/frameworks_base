@@ -5735,13 +5735,6 @@ public final class Settings {
         public static final String QS_FOOTER_TEXT_STRING = "qs_footer_text_string";
 
         /**
-         * Whether to play haptic feedback on udfps finger down event.
-         * Default 1
-         * @hide
-         */
-        public static final String ENABLE_UDFPS_START_HAPTIC_FEEDBACK = "enable_udfps_start_haptic_feedback";
-
-        /**
          * Whether auto brightness is applied one shot when screen is turned on.
          * Default 0
          * @hide
