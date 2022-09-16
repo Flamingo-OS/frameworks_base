@@ -822,6 +822,20 @@ public class ApplicationPackageManager extends PackageManager {
 
     @Override
     public boolean hasSystemFeature(String name, int version) {
+        final String packageName = ActivityThread.currentPackageName();
+        if (packageName != null &&
+                packageName.contains("com.google.android.apps.photos")) {
+            if (name.contains("PIXEL_")) {
+                try {
+                    final int year = Integer.parseInt(name.replaceAll("[^0-9]", ""));
+                    if (year >= 2020) {
+                        return false;
+                    }
+                } catch (Exception ex) {
+                    // No-op
+                }
+            }
+        }
         return mHasSystemFeatureCache.query(new HasSystemFeatureQuery(name, version));
     }
 
