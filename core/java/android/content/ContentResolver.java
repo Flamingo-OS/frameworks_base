@@ -1198,13 +1198,6 @@ public abstract class ContentResolver implements ContentInterface {
         android.util.SeempLog.record_uri(13, uri);
         Objects.requireNonNull(uri, "uri");
 
-        if (GmsCompat.isEnabled()) {
-            Cursor c = GmsHooks.interceptQuery(uri, projection);
-            if (c != null) {
-                return c;
-            }
-        }
-
         try {
             if (mWrapped != null) {
                 return mWrapped.query(uri, projection, queryArgs, cancellationSignal);
@@ -1271,7 +1264,14 @@ public abstract class ContentResolver implements ContentInterface {
             // Arbitrary and not worth documenting, as Activity
             // Manager will kill this process shortly anyway.
             return null;
-        } finally {
+        } catch (SecurityException se) {
+            if (GmsCompat.isEnabled()) {
+                Log.d("GmsCompat", "", se);
+                return null;
+            }
+            throw se;
+        }
+        finally {
             if (qCursor != null) {
                 qCursor.close();
             }
