@@ -72,6 +72,7 @@ import android.util.Size;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.gmscompat.GmsCompatApp;
 import com.android.internal.gmscompat.GmsHooks;
 import com.android.internal.gmscompat.PlayStoreHooks;
 import com.android.internal.gmscompat.dynamite.GmsDynamiteClientHooks;
@@ -2746,6 +2747,12 @@ public abstract class ContentResolver implements ContentInterface {
     @UnsupportedAppUsage
     public final void registerContentObserver(Uri uri, boolean notifyForDescendents,
             ContentObserver observer, @UserIdInt int userHandle) {
+        if (GmsCompat.isEnabled()) {
+            if (GmsCompatApp.registerObserver(uri, observer)) {
+                return;
+            }
+        }
+
         try {
             getContentService().registerContentObserver(uri, notifyForDescendents,
                     observer.getContentObserver(), userHandle, mTargetSdkVersion);
@@ -2762,6 +2769,13 @@ public abstract class ContentResolver implements ContentInterface {
      */
     public final void unregisterContentObserver(@NonNull ContentObserver observer) {
         Objects.requireNonNull(observer, "observer");
+
+        if (GmsCompat.isEnabled()) {
+            if (GmsCompatApp.unregisterObserver(observer)) {
+                return;
+            }
+        }
+
         try {
             IContentObserver contentObserver = observer.releaseContentObserver();
             if (contentObserver != null) {
