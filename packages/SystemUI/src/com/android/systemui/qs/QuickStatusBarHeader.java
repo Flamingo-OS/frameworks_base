@@ -315,7 +315,7 @@ public class QuickStatusBarHeader extends FrameLayout implements
             }
             final int textColorSecondary = Utils.getColorAttrDefaultColor(mContext,
                 mBatteryRemainingIcon.isCircleBatteryStyle()
-                    ? android.R.attr.textColorHint
+                    ? com.android.internal.R.attr.colorSurfaceVariant
                     : android.R.attr.textColorSecondary);
             mBatteryRemainingIcon.updateColors(mTextColorPrimary, textColorSecondary,
                     mTextColorPrimary);
