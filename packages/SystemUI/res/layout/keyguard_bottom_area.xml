@@ -66,8 +66,7 @@
         android:layout_marginBottom="60dp"
         android:orientation="vertical"
         android:layout_gravity="bottom|center_horizontal"
-        android:gravity="center_horizontal"
-        android:visibility="gone" />
+        android:gravity="center_horizontal" />
 
     <com.android.systemui.statusbar.KeyguardAffordanceView
         android:id="@+id/camera_button"
