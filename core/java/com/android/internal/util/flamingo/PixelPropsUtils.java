@@ -38,7 +38,7 @@ public final class PixelPropsUtils {
 
     private static volatile boolean sIsGms = false;
     public static final String PACKAGE_GMS = "com.google.android.gms";
-    public static final String PROCESS_GMS_UNSTABLE = "com.google.android.gms.unstable";
+    public static final String PROCESS_GMS_UNSTABLE = PACKAGE_GMS + ".unstable";
 
     private static final Map<String, Object> commonProps = Map.ofEntries(
         entry("BRAND", "google"),
@@ -64,6 +64,13 @@ public final class PixelPropsUtils {
         entry("FINGERPRINT", "google/marlin/marlin:10/QP1A.191005.007.A3/5972272:user/release-keys")
     );
 
+    private static final Map<String, String> anglerProps = Map.ofEntries(
+        entry("DEVICE", "angler"),
+        entry("PRODUCT", "angler"),
+        entry("MODEL", "angler"),
+        entry("FINGERPRINT", "google/angler/angler:6.0/MDB08L/2343525:user/release-keys")
+    );
+
     private static final Set<String> packagesToChange = Set.of(
         "com.google.android.apps.customization.pixel",
         "com.google.android.apps.fitness",
@@ -81,7 +88,6 @@ public final class PixelPropsUtils {
         "com.google.android.configupdater",
         "com.google.android.dialer",
         "com.google.android.ext.services",
-        "com.google.android.gms",
         "com.google.android.gms.location.history",
         "com.google.android.googlequicksearchbox",
         "com.google.android.gsf",
@@ -114,14 +120,7 @@ public final class PixelPropsUtils {
         }
         if (packagesToChange.contains(packageName)) {
             commonProps.forEach(PixelPropsUtils::setPropValue);
-            cheetahProps.forEach((key, value) -> {
-                if (key.equals("MODEL") && packageName.equals(PACKAGE_GMS) 
-                    && PROCESS_GMS_UNSTABLE.equals(Application.getProcessName()))) {
-                    sIsGms = true;
-                } else {
-                    setPropValue(key, value);
-                }
-            });
+            cheetahProps.forEach(PixelPropsUtils::setPropValue);
         } else if (packagesToChangePixelXL.contains(packageName)) {
             commonProps.forEach(PixelPropsUtils::setPropValue);
             marlinProps.forEach(PixelPropsUtils::setPropValue);
@@ -129,6 +128,11 @@ public final class PixelPropsUtils {
         // Set proper indexing fingerprint
         if (packageName.equals("com.google.android.settings.intelligence")) {
             setPropValue("FINGERPRINT", Build.DATE);
+        }
+        // device integrity check hacks
+        if (packageName.equals(PACKAGE_GMS) && PROCESS_GMS_UNSTABLE.equals(Application.getProcessName())) {
+            setPropValue("FINGERPRINT", anglerProps.get("FINGERPRINT"));
+            setPropValue("MODEL", anglerProps.get("MODEL"));
         }
     }
 
