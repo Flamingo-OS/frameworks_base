@@ -684,6 +684,7 @@ public class CentralSurfacesImpl extends CoreStartable implements
     private final SystemSettings mSystemSettings;
     private final SysUiState mSysUiState;
     private final BurnInProtectionController mBurnInProtectionController;
+    private final DeviceStateManager mDeviceStateManager;
 
     /**
      * Public constructor for CentralSurfaces.
@@ -881,6 +882,7 @@ public class CentralSurfacesImpl extends CoreStartable implements
         mJankMonitor = jankMonitor;
         mDreamOverlayStateController = dreamOverlayStateController;
         mSysUiState = sysUiState;
+        mDeviceStateManager = deviceStateManager;
 
         mSettingsObserver = new SettingsObserver(backgroundHandler);
 
@@ -921,8 +923,6 @@ public class CentralSurfacesImpl extends CoreStartable implements
         mMessageRouter.subscribeTo(MSG_LAUNCH_TRANSITION_TIMEOUT,
                 id -> onLaunchTransitionTimeout());
 
-        deviceStateManager.registerCallback(mMainExecutor,
-                new FoldStateListener(mContext, this::onFoldedStateChanged));
         wiredChargingRippleController.registerCallbacks();
         mBurnInProtectionController.setCentralSurfaces(this);
     }
@@ -1569,6 +1569,9 @@ public class CentralSurfacesImpl extends CoreStartable implements
         mNotificationShelfController = mCentralSurfacesComponent.getNotificationShelfController();
         mAuthRippleController = mCentralSurfacesComponent.getAuthRippleController();
         mAuthRippleController.init();
+
+        mDeviceStateManager.registerCallback(mMainExecutor,
+                new FoldStateListener(mContext, this::onFoldedStateChanged));
 
         mHeadsUpManager.addListener(mCentralSurfacesComponent.getStatusBarHeadsUpChangeListener());
 
