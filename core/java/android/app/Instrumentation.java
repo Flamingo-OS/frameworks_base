@@ -1814,7 +1814,7 @@ public class Instrumentation {
             checkStartActivityResult(result, intent);
 
             if (GmsCompat.isEnabled()) {
-                GmsHooks.onActivityStart(result, intent, options);
+                GmsHooks.onActivityStart(result, intent, requestCode, options);
             }
 
         } catch (RemoteException e) {
