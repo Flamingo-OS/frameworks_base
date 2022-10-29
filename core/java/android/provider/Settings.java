@@ -11326,36 +11326,6 @@ public final class Settings {
         public static final String SECURE_LOCKSCREEN_QS_DISABLED = "secure_lockscreen_qs_disabled";
 
         /**
-         * Accurate shades (default 1)
-         * @hide
-         */
-        public static final String MONET_ENGINE_ACCURATE_SHADES = "monet_engine_accurate_shades";
-
-        /**
-         * Color override (default null)
-         * @hide
-         */
-        public static final String MONET_ENGINE_COLOR_OVERRIDE = "monet_engine_color_override";
-
-        /**
-         * Colorfulness (default 1.0)
-         * @hide
-         */
-        public static final String MONET_ENGINE_CHROMA_FACTOR = "monet_engine_chroma_factor";
-
-        /**
-         * Custom lightness scale (default 0)
-         * @hide
-         */
-        public static final String MONET_ENGINE_LINEAR_LIGHTNESS = "monet_engine_linear_lightness";
-
-        /**
-         * Brightness (default 425, range 0-1000; depends on custom lightness)
-         * @hide
-         */
-        public static final String MONET_ENGINE_WHITE_LUMINANCE = "monet_engine_white_luminance";
-
-        /**
          * Whether to enable combined signal icons.
          * Default false.
          * @hide
@@ -11423,8 +11393,6 @@ public final class Settings {
          */
         public static final Set<String> INSTANT_APP_SETTINGS = new ArraySet<>();
         static {
-            INSTANT_APP_SETTINGS.add(ENABLED_ACCESSIBILITY_SERVICES);
-            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_SPEAK_PASSWORD);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_DISPLAY_INVERSION_ENABLED);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_ENABLED);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_PRESET);
