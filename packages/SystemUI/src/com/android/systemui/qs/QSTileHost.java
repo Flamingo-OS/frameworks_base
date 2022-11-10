@@ -20,6 +20,7 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.os.Build;
+import android.os.Handler;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -37,6 +38,7 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.plugins.PluginListener;
@@ -117,7 +119,6 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory>, D
     private final TileServiceRequestController mTileServiceRequestController;
     private TileLifecycleManager.Factory mTileLifeCycleManagerFactory;
     private final ContentObserver mSettingsObserver;
-    private final Handler mMainHandler;
     private boolean mIsSecureTileDisabledOnLockscreen = true;
 
     @Inject
@@ -150,7 +151,6 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory>, D
         mMainExecutor = mainExecutor;
         mTileServiceRequestController = tileServiceRequestControllerBuilder.create(this);
         mTileLifeCycleManagerFactory = tileLifecycleManagerFactory;
-        mMainHandler = mainHandler;
 
         mInstanceIdSequence = new InstanceIdSequence(MAX_QS_INSTANCE_ID);
         mCentralSurfacesOptional = centralSurfacesOptional;
@@ -188,7 +188,7 @@ public class QSTileHost implements QSHost, Tunable, PluginListener<QSFactory>, D
         final boolean disabled = mSecureSettings.getIntForUser(
             Settings.Secure.DISABLE_SECURE_TILES_ON_LOCKSCREEN,
             1, UserHandle.USER_CURRENT) == 1;
-        mMainHandler.post(() -> {
+        mMainExecutor.execute(() -> {
             mIsSecureTileDisabledOnLockscreen = disabled;
             mTiles.values().stream()
                 .filter(tile -> tile instanceof SecureQSTile)
