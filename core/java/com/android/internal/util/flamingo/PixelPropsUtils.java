@@ -64,19 +64,13 @@ public final class PixelPropsUtils {
     );
 
     private static final List<String> packagesToChange = List.of(
-        "com.breel.wallpapers20",
         "com.google.android.apps.customization.pixel",
         "com.google.android.apps.fitness",
         "com.google.android.apps.gcs",
-        "com.google.android.apps.maps",
         "com.google.android.apps.nexuslauncher",
         "com.google.android.apps.messaging",
-        "com.google.android.apps.pixelmigrate",
-        "com.google.android.apps.recorder",
         "com.google.android.apps.safetyhub",
-        "com.google.android.apps.subscriptions.red",
         "com.google.android.apps.tachyon",
-        "com.google.android.apps.translate",
         "com.google.android.apps.turbo",
         "com.google.android.apps.turboadapter",
         "com.google.android.apps.wallpaper",
@@ -98,8 +92,8 @@ public final class PixelPropsUtils {
     );
 
     private static final List<String> packagesToChangePixelXL = List.of(
-        "com.google.android.apps.photos",
-        "com.samsung.accessory.berrymgr",
+        "com.google.android.apps.photos", // unlimited photos
+        "com.samsung.accessory.berrymgr", // Sammy apps for wearables to fix crash 
         "com.samsung.accessory.fridaymgr",
         "com.samsung.accessory.neobeanmgr",
         "com.samsung.android.app.watchmanager",
