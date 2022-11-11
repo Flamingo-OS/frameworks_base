@@ -49,11 +49,11 @@ public final class PixelPropsUtils {
         entry("TYPE", "user")
     );
 
-    private static final Map<String, String> ravenProps = Map.ofEntries(
-        entry("DEVICE", "raven"),
-        entry("PRODUCT", "raven"),
-        entry("MODEL", "Pixel 6 Pro"),
-        entry("FINGERPRINT", "google/raven/raven:13/TP1A.221005.002/9012097:user/release-keys")
+    private static final Map<String, String> cheetahProps = Map.ofEntries(
+        entry("DEVICE", "cheetah"),
+        entry("PRODUCT", "cheetah"),
+        entry("MODEL", "Pixel 7 Pro"),
+        entry("FINGERPRINT", "google/cheetah/cheetah:13/TD1A.220804.031/9071314:user/release-keys")
     );
 
     private static final Map<String, String> marlinProps = Map.ofEntries(
@@ -119,7 +119,7 @@ public final class PixelPropsUtils {
         }
         if (packagesToChange.contains(packageName)) {
             commonProps.forEach(PixelPropsUtils::setPropValue);
-            ravenProps.forEach((key, value) -> {
+            cheetahProps.forEach((key, value) -> {
                 if (key.equals("MODEL") && packageName.equals(PACKAGE_GMS)) {
                      sIsGms = true;
                      return;
