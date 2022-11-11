@@ -22,6 +22,14 @@ import com.android.internal.os.IKeyHandler;
  * @hide
  */
 oneway interface IDeviceKeyManager {
-    void registerKeyHandler(in IKeyHandler keyHandler, in int[] scanCodes, in int[] actions);
-    void unregisterKeyHandler(in IKeyHandler keyHandler);
+
+    void registerKeyHandler(
+        in IBinder token,
+        in IKeyHandler keyHandler,
+        in int[] scanCodes,
+        in int[] actions,
+        in int deviceId
+    );
+
+    void unregisterKeyHandler(in IBinder token);
 }

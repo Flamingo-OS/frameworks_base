@@ -17,7 +17,7 @@
 package com.android.server.policy
 
 import android.content.Context
-import android.os.DeadObjectException
+import android.os.IBinder
 import android.os.RemoteException
 import android.util.Slog
 import android.view.KeyEvent
@@ -46,7 +46,9 @@ private val TAG = DeviceKeyManager::class.simpleName
  * components. Binding with this class requires for the component to
  * extend a Service and register key handler with [IDeviceKeyManager],
  * providing the scan codes it is expecting to handle, and the event actions.
- * Unregister when lifecycle of Service ends.
+ * Device id maybe optional, pass -1 to handle [KeyEvent]s from any device.
+ * Unregister when lifecycle of the Service ends with the same token used for
+ * registering.
  *
  * @hide
  */
@@ -55,35 +57,43 @@ class DeviceKeyManager(context: Context) : SystemService(context) {
     private val mutex = Mutex()
 
     @GuardedBy("mutex")
-    private val keyHandlerDataList = mutableListOf<KeyHandlerData>()
+    private val keyHandlerDataMap = mutableMapOf<IBinder, KeyHandlerData>()
 
     private val service = object : IDeviceKeyManager.Stub() {
 
         override fun registerKeyHandler(
+            token: IBinder,
             keyHandler: IKeyHandler,
             scanCodes: IntArray,
-            actions: IntArray
+            actions: IntArray,
+            deviceId: Int
         ) {
             val id = UUID.randomUUID()
-            Slog.i(TAG, "Registering new key handler, id = $id")
+            Slog.i(TAG, "Registering new key handler - $id")
             coroutineScope.launch {
                 mutex.withLock {
-                    keyHandlerDataList.add(
-                        KeyHandlerData(
-                            id,
-                            keyHandler,
-                            scanCodes.toSet(),
-                            actions.toSet()
-                        )
+                    try {
+                        token.linkToDeath({ unregisterKeyHandler(token) }, 0)
+                    } catch (e: RemoteException) {
+                        Slog.e(TAG, "Client $id died before created.")
+                    }
+                    keyHandlerDataMap[token] = KeyHandlerData(
+                        id,
+                        keyHandler,
+                        scanCodes.toSet(),
+                        actions.toSet(),
+                        deviceId
                     )
                 }
             }
         }
 
-        override fun unregisterKeyHandler(keyHandler: IKeyHandler) {
+        override fun unregisterKeyHandler(token: IBinder) {
             coroutineScope.launch {
                 mutex.withLock {
-                    keyHandlerDataList.removeIf { it.keyHandler == keyHandler }
+                    keyHandlerDataMap.remove(token)?.let {
+                        Slog.i(TAG, "Unregistered key handler - ${it.id}")
+                    } ?: Slog.e(TAG, "No KeyHandler was registered for the given $token")
                 }
             }
         }
@@ -92,29 +102,25 @@ class DeviceKeyManager(context: Context) : SystemService(context) {
     private val localService = object : DeviceKeyManagerInternal {
 
         override fun handleKeyEvent(keyEvent: KeyEvent): Boolean {
-            val keyHandlerDataListToCall = runBlocking {
+            val keyHandlerDataMapToCall = runBlocking {
                 mutex.withLock {
-                    keyHandlerDataList.filter {
-                        it.canHandleAction(keyEvent.action) &&
-                            it.canHandleScanCode(keyEvent.scanCode)
+                    keyHandlerDataMap.values.filter {
+                        it.canHandleKeyEvent(keyEvent)
                     }
                 }
             }
             coroutineScope.launch {
                 mutex.withLock {
-                    keyHandlerDataListToCall.forEach { keyHandlerData ->
+                    keyHandlerDataMapToCall.forEach { keyHandlerData ->
                         try {
                             keyHandlerData.handleKeyEvent(keyEvent)
-                        } catch(e: DeadObjectException) {
-                            Slog.e(TAG, "Keyhandler with id ${keyHandlerData.id} has died, removing", e)
-                            keyHandlerDataList.removeIf { it.keyHandler == keyHandlerData.keyHandler }
                         } catch(e: RemoteException) {
-                            Slog.e(TAG, "Failed to deliver key event $keyEvent to keyhandler with id ${keyHandlerData.id}", e)
+                            Slog.e(TAG, "Failed to deliver KeyEvent to KeyHandler ${keyHandlerData.id}", e)
                         }
                     }
                 }
             }
-            return keyHandlerDataListToCall.size > 0;
+            return keyHandlerDataMapToCall.size > 0;
         }
     }
 
@@ -136,13 +142,23 @@ interface DeviceKeyManagerInternal {
 
 private data class KeyHandlerData(
     val id: UUID,
-    val keyHandler: IKeyHandler,
+    private val keyHandler: IKeyHandler,
     private val scanCodes: Set<Int>,
-    private val actions: Set<Int>
+    private val actions: Set<Int>,
+    private val deviceId: Int
 ) {
-    fun canHandleScanCode(scanCode: Int) = scanCodes.contains(scanCode)
-
-    fun canHandleAction(action: Int) = actions.contains(action)
+    fun canHandleKeyEvent(event: KeyEvent): Boolean {
+        if (deviceId != -1 && deviceId != event.deviceId) {
+            return false
+        }
+        if (actions.isNotEmpty() && !actions.contains(event.action)) {
+            return false
+        }
+        if (scanCodes.isNotEmpty() && !scanCodes.contains(event.scanCode)) {
+            return false
+        }
+        return true
+    }
 
     fun handleKeyEvent(keyEvent: KeyEvent) {
         keyHandler.handleKeyEvent(keyEvent)
