@@ -23,10 +23,9 @@ import android.os.Build;
 import android.util.Log;
 
 import java.util.Arrays;
-import java.util.ArrayList;
 import java.lang.reflect.Field;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /*
  * @hide
@@ -63,7 +62,7 @@ public final class PixelPropsUtils {
         entry("FINGERPRINT", "google/marlin/marlin:10/QP1A.191005.007.A3/5972272:user/release-keys")
     );
 
-    private static final List<String> packagesToChange = List.of(
+    private static final Set<String> packagesToChange = Set.of(
         "com.google.android.apps.customization.pixel",
         "com.google.android.apps.fitness",
         "com.google.android.apps.gcs",
@@ -91,7 +90,7 @@ public final class PixelPropsUtils {
         "com.google.pixel.livewallpaper"
     );
 
-    private static final List<String> packagesToChangePixelXL = List.of(
+    private static final Set<String> packagesToChangePixelXL = Set.of(
         "com.google.android.apps.photos", // unlimited photos
         "com.samsung.accessory.berrymgr", // Sammy apps for wearables to fix crash 
         "com.samsung.accessory.fridaymgr",
@@ -115,8 +114,7 @@ public final class PixelPropsUtils {
             commonProps.forEach(PixelPropsUtils::setPropValue);
             cheetahProps.forEach((key, value) -> {
                 if (key.equals("MODEL") && packageName.equals(PACKAGE_GMS)) {
-                     sIsGms = true;
-                     return;
+                    sIsGms = true;
                 } else {
                     setPropValue(key, value);
                 }
