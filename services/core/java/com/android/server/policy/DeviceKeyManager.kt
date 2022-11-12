@@ -17,8 +17,11 @@
 package com.android.server.policy
 
 import android.content.Context
+import android.os.Binder
 import android.os.IBinder
+import android.os.Process
 import android.os.RemoteException
+import android.os.UserHandle
 import android.util.Slog
 import android.view.KeyEvent
 
@@ -68,6 +71,7 @@ class DeviceKeyManager(context: Context) : SystemService(context) {
             actions: IntArray,
             deviceId: Int
         ) {
+            enforceCallerIsSystem()
             val id = UUID.randomUUID()
             Slog.i(TAG, "Registering new key handler - $id")
             coroutineScope.launch {
@@ -89,6 +93,7 @@ class DeviceKeyManager(context: Context) : SystemService(context) {
         }
 
         override fun unregisterKeyHandler(token: IBinder) {
+            enforceCallerIsSystem()
             coroutineScope.launch {
                 mutex.withLock {
                     keyHandlerDataMap.remove(token)?.let {
@@ -130,6 +135,14 @@ class DeviceKeyManager(context: Context) : SystemService(context) {
         coroutineScope = CoroutineScope(Dispatchers.Default)
         publishBinderService(BINDER_SERVICE_NAME, service)
         LocalServices.addService(DeviceKeyManagerInternal::class.java, localService)
+    }
+
+    private fun enforceCallerIsSystem() {
+        val callingUid = Binder.getCallingUid()
+        val isSystem = UserHandle.isSameApp(callingUid, Process.SYSTEM_UID)
+        if (!isSystem) {
+            throw SecurityException("Caller $callingUid does not belong to system uid")
+        }
     }
 }
 
