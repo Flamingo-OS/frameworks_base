@@ -21,4 +21,6 @@
     <!-- Message for updating an existing system app [CHAR LIMIT=NONE] -->
     <string name="new_version_number">将安装: <xliff:g id="new_version">%1$s</xliff:g></string>
 
+    <string name="allow_network_permission_checkbox">允许网络权限</string>
+
 </resources>
