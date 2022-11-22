@@ -148,6 +148,7 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Звонить по Wi‑Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Звонить по мобильной сети"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Только Wi-Fi"</string>
+    <string name="wfc_mode_ims_preferred_summary">Примущественно Ims</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Резервный способ связи: <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -329,6 +330,10 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"доступ к данным датчиков о состоянии организма"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"Уведомления"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"показ уведомлений"</string>
+    <string name="permgrouplab_otherSensors">Сенсоры</string>
+    <string name="permgroupdesc_otherSensors">доступ к данным датчиков об ориентации, движении и т.д.</string>
+    <string name="permgrouplab_network">Сеть</string>
+    <string name="permgroupdesc_network">доступ к сети</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Получать содержимое окна"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Анализировать содержимое активного окна."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Включать Изучение касанием"</string>
@@ -431,6 +436,10 @@
     <string name="permdesc_bodySensors" product="default" msgid="7652650410295512140">"Когда приложение используется, это разрешение предоставляет ему доступ к данным нательных датчиков (например, пульсу, температуре, уровню кислорода в крови)."</string>
     <string name="permlab_bodySensors_background" msgid="4912560779957760446">"Доступ к данным нательных датчиков, когда приложение работает в фоновом режиме"</string>
     <string name="permdesc_bodySensors_background" product="default" msgid="8870726027557749417">"Когда приложение работает в фоновом режиме, это разрешение предоставляет ему доступ к данным нательных датчиков (например, пульсу, температуре, уровню кислорода в крови)."</string>
+    <string name="permlab_otherSensors">доступ к датчикам (например, компасу)
+    </string>
+    <string name="permdesc_otherSensors" product="default">Позволяет приложению получать доступ к данным от датчиков
+        отслеживающих ориентацию, движение, вибрацию (включая низкочастотный звук) и данные об окружающей среде</string>
     <string name="permlab_readCalendar" msgid="6408654259475396200">"Чтение мероприятий и данных"</string>
     <string name="permdesc_readCalendar" product="tablet" msgid="515452384059803326">"Приложение может считывать, отправлять и сохранять информацию о мероприятиях в календаре планшета."</string>
     <string name="permdesc_readCalendar" product="tv" msgid="5811726712981647628">"Приложение может считывать, отправлять и сохранять информацию о мероприятиях в календаре устройства Android TV."</string>
