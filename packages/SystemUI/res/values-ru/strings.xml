@@ -260,6 +260,10 @@
       <item quantity="many">%d устройств</item>
       <item quantity="other">%d устройства</item>
     </plurals>
+    <plurals name="quick_settings_internet_hotspot_summary_num_devices">
+        <item quantity="one">%d устройство подключено</item>
+        <item quantity="other">%d устройств подключено</item>
+    </plurals>
     <string name="quick_settings_flashlight_label" msgid="4904634272006284185">"Фонарик"</string>
     <string name="quick_settings_flashlight_camera_in_use" msgid="4820591564526512571">"Используется камера"</string>
     <string name="quick_settings_cellular_detail_title" msgid="792977203299358893">"Мобильный интернет"</string>
@@ -479,6 +483,7 @@
     <string name="qr_code_scanner_title" msgid="5290201053875420785">"Сканировать QR-код"</string>
     <string name="status_bar_work" msgid="5238641949837091056">"Рабочий профиль"</string>
     <string name="status_bar_airplane" msgid="4848702508684541009">"Режим полета"</string>
+    <string name="zen_alarm_warning_indef">Вы не услышите свой следующий сигнал <xliff:g id="when" example="at 7:00 AM">%1$s</xliff:g> если вы не отключите его до этого</string>
     <string name="zen_alarm_warning" msgid="7844303238486849503">"Следующий будильник: <xliff:g id="WHEN">%1$s</xliff:g>. Звук отключен."</string>
     <string name="alarm_template" msgid="2234991538018805736">"<xliff:g id="WHEN">%1$s</xliff:g>"</string>
     <string name="alarm_template_far" msgid="3561752195856839456">"<xliff:g id="WHEN">%1$s</xliff:g>"</string>
@@ -723,6 +728,8 @@
     <string name="running_foreground_services_msg" msgid="3009459259222695385">"Нажмите, чтобы проверить энергопотребление и трафик"</string>
     <string name="mobile_data_disable_title" msgid="5366476131671617790">"Отключить мобильный Интернет?"</string>
     <string name="mobile_data_disable_message" msgid="8604966027899770415">"Вы не сможете передавать данные или выходить в Интернет через оператора \"<xliff:g id="CARRIER">%s</xliff:g>\". Интернет будет доступен только по сети Wi-Fi."</string>
+    <string name="mobile_data_disable_ciwlan_call_message">Отключение мобильных данных может привести к прерыванию вызова.</string>
+    <string name="mobile_data_summary_not_allowed_to_disable_data">Недоступен во время вызова на другой SIM-карте</string>
     <string name="mobile_data_disable_message_default_carrier" msgid="6496033312431658238">"ваш оператор"</string>
     <string name="touch_filtered_warning" msgid="8119511393338714836">"Невозможно принять ваше согласие, поскольку запрос скрыт другим приложением."</string>
     <string name="slice_permission_title" msgid="3262615140094151017">"Разрешить приложению \"<xliff:g id="APP_0">%1$s</xliff:g>\" показывать фрагменты приложения \"<xliff:g id="APP_2">%2$s</xliff:g>\"?"</string>
@@ -971,4 +978,10 @@
     <string name="dream_overlay_status_bar_alarm_set" msgid="566707328356590886">"Будильник установлен"</string>
     <string name="dream_overlay_status_bar_camera_mic_off" msgid="3199425257833773569">"Камера и микрофон отключены"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# уведомление}one{# уведомление}few{# уведомления}many{# уведомлений}other{# уведомления}}"</string>
+    <string name="broadcasting_description_is_broadcasting">Трансляция</string>
+    <string name="bt_le_audio_broadcast_dialog_title">Прекратить трансляцию <xliff:g id="app_name" example="App Name 1">%1$s</xliff:g>?</string>
+    <string name="bt_le_audio_broadcast_dialog_sub_title">Если вы транслируете <xliff:g id="switchApp" example="App Name 2">%1$s</xliff:g> или измените источник, текущая трансляция прекратится</string>
+    <string name="bt_le_audio_broadcast_dialog_switch_app">Трансляция <xliff:g id="switchApp" example="App Name 2">%1$s</xliff:g></string>
+    <string name="bt_le_audio_broadcast_dialog_different_output">Изменить источник</string>
+    <string name="bt_le_audio_broadcast_dialog_unknown_name">Неизвестно</string>    
 </resources>
