@@ -248,6 +248,7 @@ import com.android.systemui.wmshell.BubblesManager;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.SplashscreenContentDrawer;
 import com.android.wm.shell.startingsurface.StartingSurface;
+import com.flamingo.systemui.pocket.PocketLock;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -686,6 +687,9 @@ public class CentralSurfacesImpl extends CoreStartable implements
     private final BurnInProtectionController mBurnInProtectionController;
     private final DeviceStateManager mDeviceStateManager;
 
+    @Nullable
+    private final PocketLock mPocketLock;
+
     /**
      * Public constructor for CentralSurfaces.
      *
@@ -925,6 +929,12 @@ public class CentralSurfacesImpl extends CoreStartable implements
 
         wiredChargingRippleController.registerCallbacks();
         mBurnInProtectionController.setCentralSurfaces(this);
+
+        if (mContext.getSystemService(Context.POCKET_SERVICE) != null) {
+            mPocketLock = new PocketLock(mContext);
+        } else {
+            mPocketLock = null;
+        }
     }
 
     @Override
@@ -4167,6 +4177,28 @@ public class CentralSurfacesImpl extends CoreStartable implements
         }
         if (getNavigationBarView() != null) {
             getNavigationBarView().setBlockedGesturalNavigation(blocked, mSysUiState);
+        }
+    }
+
+    @Override
+    public void showPocketLock() {
+        final boolean isInteractive = mPowerManager.isInteractive();
+        if (isInteractive) {
+            final boolean isKeyguardNotShowingOrOccluded =
+                !mKeyguardStateController.isShowing() || mKeyguardStateController.isOccluded();
+            if (isKeyguardNotShowingOrOccluded) {
+                return;
+            }
+        }
+        if (mPocketLock != null) {
+            mPocketLock.show(isInteractive /* animate */);
+        }
+    }
+
+    @Override
+    public void hidePocketLock() {
+        if (mPocketLock != null) {
+            mPocketLock.hide(mPowerManager.isInteractive() /* animate */);
         }
     }
 

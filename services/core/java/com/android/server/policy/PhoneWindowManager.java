@@ -152,8 +152,6 @@ import android.os.VibrationAttributes;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.DeviceConfig;
-import android.pocket.IPocketCallback;
-import android.pocket.PocketManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.service.dreams.DreamManagerInternal;
@@ -210,11 +208,11 @@ import com.android.server.GestureLauncherService;
 import com.android.server.LocalServices;
 import com.android.server.SystemServiceManager;
 import com.android.server.inputmethod.InputMethodManagerInternal;
+import com.android.server.pocket.PocketServiceInternal;
 import com.android.server.policy.KeyCombinationManager.TwoKeysCombinationRule;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate.DrawnListener;
 import com.android.server.policy.keyguard.KeyguardStateMonitor.StateCallback;
-import com.android.server.policy.pocket.PocketLock;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -375,6 +373,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private static final String ACTION_VOICE_ASSIST_RETAIL =
             "android.intent.action.VOICE_ASSIST_RETAIL";
+    
+    private static final Set<Integer> sPocketLockAllowedKeycodes =
+        Set.of(
+            KeyEvent.KEYCODE_POWER,
+            KeyEvent.KEYCODE_VOLUME_UP,
+            KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_HEADSETHOOK,
+            KeyEvent.KEYCODE_MEDIA_STOP,
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_VOLUME_MUTE
+        );
 
     /**
      * Lock protecting internal state.  Must not call out into window
@@ -635,29 +648,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private DeviceKeyManagerInternal mDeviceKeyManager = null;
 
-    private PocketManager mPocketManager;
-    private PocketLock mPocketLock;
-    private boolean mPocketLockShowing;
-    private boolean mIsDeviceInPocket;
-    private final IPocketCallback mPocketCallback = new IPocketCallback.Stub() {
-
-        @Override
-        public void onStateChanged(boolean isDeviceInPocket, int reason) {
-            boolean wasDeviceInPocket = mIsDeviceInPocket;
-            if (reason == PocketManager.REASON_SENSOR) {
-                mIsDeviceInPocket = isDeviceInPocket;
-            } else {
-                mIsDeviceInPocket = false;
-            }
-            if (wasDeviceInPocket != mIsDeviceInPocket) {
-                handleDevicePocketStateChanged();
-                //if (mKeyHandler != null) {
-                    //mKeyHandler.setIsInPocket(mIsDeviceInPocket);
-                //}
-            }
-        }
-
-    };
+    @Nullable
+    private PocketServiceInternal mPocketServiceInternal = null;
 
     private static final int MSG_DISPATCH_MEDIA_KEY_WITH_WAKE_LOCK = 3;
     private static final int MSG_DISPATCH_MEDIA_KEY_REPEAT_WITH_WAKE_LOCK = 4;
@@ -925,6 +917,32 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    private PocketServiceInternal getPocketServiceInternal() {
+        synchronized (mServiceAcquireLock) {
+            if (mPocketServiceInternal == null) {
+                mPocketServiceInternal = LocalServices.getService(PocketServiceInternal.class);
+            }
+            return mPocketServiceInternal;
+        }
+    }
+
+    private void hidePocketLockAndStopListening() {
+        if (getPocketServiceInternal() != null) {
+            // This will dispatch callback internally and hide accordingly
+            getPocketServiceInternal().stopListening();
+        }
+    }
+
+    private boolean isPocketLockShowing() {
+        return getPocketServiceInternal() != null &&
+            getPocketServiceInternal().isPocketLockShowing();
+    }
+
+    private boolean isDeviceInPocket() {
+        return getPocketServiceInternal() != null &&
+            getPocketServiceInternal().isDeviceInPocket();
+    }
+
     // returns true if the key was handled and should not be passed to the user
     private boolean backKeyPress() {
         mLogger.count("key_back_press", 1);
@@ -965,7 +983,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         // Still allow muting call with power button press.
-        boolean blockInputs = mIsDeviceInPocket && (!interactive || mPocketLockShowing);
+        boolean blockInputs = isDeviceInPocket() && (!interactive || isPocketLockShowing());
 
         mWindowManagerFuncs.onPowerKeyDown(interactive);
 
@@ -1290,8 +1308,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case LONG_PRESS_POWER_HIDE_POCKET_LOCK:
                 mPowerKeyHandled = true;
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, false, "Power - Long-Press - Hide Pocket Lock");
-                hidePocketLock(true);
-                mPocketManager.setListeningExternal(false);
+                hidePocketLockAndStopListening();
                 break;
         }
     }
@@ -1370,7 +1387,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return LONG_PRESS_POWER_SHUT_OFF_NO_CONFIRM;
         }
 
-        if (mPocketLockShowing) {
+        if (isPocketLockShowing()) {
             return LONG_PRESS_POWER_HIDE_POCKET_LOCK;
         }
 
@@ -1653,7 +1670,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private void handleScreenShot(@WindowManager.ScreenshotType int type,
             @WindowManager.ScreenshotSource int source) {
-        if (!mPocketLockShowing)
+        if (!isPocketLockShowing())
             mDefaultDisplayPolicy.takeScreenshot(type, source);
     }
 
@@ -3850,20 +3867,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         // Pre-basic policy based on interactive and pocket lock state.
-        if (mIsDeviceInPocket && (!interactive || mPocketLockShowing)) {
-            if (keyCode != KeyEvent.KEYCODE_POWER &&
-                keyCode != KeyEvent.KEYCODE_VOLUME_UP &&
-                keyCode != KeyEvent.KEYCODE_VOLUME_DOWN &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_PLAY &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_PAUSE &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE &&
-                keyCode != KeyEvent.KEYCODE_HEADSETHOOK &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_STOP &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_NEXT &&
-                keyCode != KeyEvent.KEYCODE_MEDIA_PREVIOUS &&
-                keyCode != KeyEvent.KEYCODE_VOLUME_MUTE) {
-                return 0;
-            }
+        if (isDeviceInPocket() &&
+                (!interactive || isPocketLockShowing()) &&
+                !sPocketLockAllowedKeycodes.contains(keyCode)
+        ) {
+            return 0;
         }
 
         // Basic policy based on interactive state.
@@ -4702,8 +4710,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mKeyguardDelegate != null) {
             mKeyguardDelegate.onStartedGoingToSleep(pmSleepReason);
         }
-        if (mPocketManager != null) {
-            mPocketManager.onInteractiveChanged(false);
+        if (getPocketServiceInternal() != null) {
+            getPocketServiceInternal().onInteractiveChanged(false);
         }
     }
 
@@ -4784,8 +4792,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         mCameraGestureTriggered = false;
 
-        if (mPocketManager != null) {
-            mPocketManager.onInteractiveChanged(true);
+        if (getPocketServiceInternal() != null) {
+            getPocketServiceInternal().onInteractiveChanged(true);
         }
     }
 
@@ -5044,72 +5052,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    /**
-     * Perform operations if needed on pocket mode state changed.
-     * @see com.android.server.pocket.PocketService
-     * @see PocketLock
-     * @see this.mPocketCallback;
-     * @author Carlo Savignano
-     */
-    private void handleDevicePocketStateChanged() {
-        final boolean interactive = mPowerManager.isInteractive();
-        if (mIsDeviceInPocket) {
-            showPocketLock(interactive);
-        } else {
-            hidePocketLock(interactive);
-        }
-    }
-
-    /**
-     * Check if we can show pocket lock once requested.
-     * @see com.android.server.pocket.PocketService
-     * @see PocketLock
-     * @see this.mPocketCallback;
-     * @author Carlo Savignano
-     */
-    private void showPocketLock(boolean animate) {
-        if (!mSystemReady || !mSystemBooted || !mKeyguardDrawnOnce
-                || mPocketLock == null || mPocketLockShowing) {
-            return;
-        }
-
-        if (mPowerManager.isInteractive() && !isKeyguardShowingAndNotOccluded()){
-            return;
-        }
-
-        if (DEBUG) {
-            Log.d(TAG, "showPocketLock, animate=" + animate);
-        }
-
-        mPocketLock.show(animate);
-        mPocketLockShowing = true;
-
-        mPocketManager.setPocketLockVisible(true);
-    }
-
-    /**
-     * Check if we can hide pocket lock once requested.
-     * @see com.android.server.pocket.PocketService
-     * @see PocketLock
-     * @see this.mPocketCallback;
-     * @author Carlo Savignano
-     */
-    private void hidePocketLock(boolean animate) {
-        if (!mSystemReady || !mSystemBooted || !mKeyguardDrawnOnce
-                || mPocketLock == null || !mPocketLockShowing) {
-            return;
-        }
-
-        if (DEBUG) {
-            Log.d(TAG, "hidePocketLock, animate=" + animate);
-        }
-
-        mPocketLock.hide(animate);
-        mPocketLockShowing = false;
-
-        mPocketManager.setPocketLockVisible(false);
-    }
-
     private void handleHideBootMessage() {
         synchronized (mLock) {
             if (!mKeyguardDrawnOnce) {
@@ -5275,10 +5217,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // In normal flow, systemReady is called before other system services are ready.
         // So it is better not to bind keyguard here.
         mKeyguardDelegate.onSystemReady();
-
-        mPocketManager = (PocketManager) mContext.getSystemService(Context.POCKET_SERVICE);
-        mPocketManager.addCallback(mPocketCallback);
-        mPocketLock = new PocketLock(mContext);
 
         mVrManagerInternal = LocalServices.getService(VrManagerInternal.class);
         if (mVrManagerInternal != null) {

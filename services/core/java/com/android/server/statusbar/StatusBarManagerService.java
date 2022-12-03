@@ -690,6 +690,24 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 } catch (RemoteException ex) { }
             }
         }
+
+        @Override
+        public void showPocketLock() {
+            if (mBar != null) {
+                try {
+                    mBar.showPocketLock();
+                } catch (RemoteException ex) {}
+            }
+        }
+
+        @Override
+        public void hidePocketLock() {
+            if (mBar != null) {
+                try {
+                    mBar.hidePocketLock();
+                } catch (RemoteException ex) {}
+            }
+        }
     };
 
     private final GlobalActionsProvider mGlobalActionsProvider = new GlobalActionsProvider() {

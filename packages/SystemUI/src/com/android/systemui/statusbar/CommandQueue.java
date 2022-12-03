@@ -166,6 +166,8 @@ public class CommandQueue extends IStatusBar.Stub implements
     private static final int MSG_TILE_SERVICE_REQUEST_LISTENING_STATE = 68 << MSG_SHIFT;
     private static final int MSG_TOGGLE_CAMERA_FLASH = 100 << MSG_SHIFT;
     private static final int MSG_SET_BLOCKED_GESTURAL_NAVIGATION = 101 << MSG_SHIFT;
+    private static final int MSG_SHOW_POCKET_LOCK = 102 << MSG_SHIFT;
+    private static final int MSG_HIDE_POCKET_LOCK = 103 << MSG_SHIFT;
 
     public static final int FLAG_EXCLUDE_NONE = 0;
     public static final int FLAG_EXCLUDE_SEARCH_PANEL = 1 << 0;
@@ -482,6 +484,9 @@ public class CommandQueue extends IStatusBar.Stub implements
 
         default void toggleCameraFlash() { }
         default void setBlockedGesturalNavigation(boolean blocked) {}
+
+        default void showPocketLock() {}
+        default void hidePocketLock() {}
     }
 
     public CommandQueue(Context context) {
@@ -1291,6 +1296,22 @@ public class CommandQueue extends IStatusBar.Stub implements
         }
     }
 
+    @Override
+    public void showPocketLock() {
+        synchronized (mLock) {
+            mHandler.removeMessages(MSG_HIDE_POCKET_LOCK);
+            mHandler.obtainMessage(MSG_SHOW_POCKET_LOCK).sendToTarget();
+        }
+    }
+
+    @Override
+    public void hidePocketLock() {
+        synchronized (mLock) {
+            mHandler.removeMessages(MSG_SHOW_POCKET_LOCK);
+            mHandler.obtainMessage(MSG_HIDE_POCKET_LOCK).sendToTarget();
+        }
+    }
+
     private final class H extends Handler {
         private H(Looper l) {
             super(l);
@@ -1742,6 +1763,16 @@ public class CommandQueue extends IStatusBar.Stub implements
                     break;
                 case MSG_SET_BLOCKED_GESTURAL_NAVIGATION:
                     mCallbacks.forEach(cb -> cb.setBlockedGesturalNavigation((Boolean) msg.obj));
+                    break;
+                case MSG_SHOW_POCKET_LOCK:
+                    for (int i = 0; i < mCallbacks.size(); i++) {
+                        mCallbacks.get(i).showPocketLock();
+                    }
+                    break;
+                case MSG_HIDE_POCKET_LOCK:
+                    for (int i = 0; i < mCallbacks.size(); i++) {
+                        mCallbacks.get(i).hidePocketLock();
+                    }
                     break;
             }
         }

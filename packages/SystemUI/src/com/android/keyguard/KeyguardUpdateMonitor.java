@@ -37,6 +37,7 @@ import static com.android.systemui.DejankUtils.whitelistIpcs;
 import android.annotation.AnyThread;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityTaskManager;
 import android.app.ActivityTaskManager.RootTaskInfo;
@@ -366,26 +367,19 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
     private final Handler mHandler;
 
-    private PocketManager mPocketManager;
+    @Nullable
+    private final PocketManager mPocketManager;
     private boolean mIsDeviceInPocket;
     private final IPocketCallback mPocketCallback = new IPocketCallback.Stub() {
         @Override
-        public void onStateChanged(boolean isDeviceInPocket, int reason) {
-            boolean wasInPocket = mIsDeviceInPocket;
-            if (reason == PocketManager.REASON_SENSOR) {
-                mIsDeviceInPocket = isDeviceInPocket;
-            } else {
-                mIsDeviceInPocket = false;
-            }
+        public void onStateChanged(final boolean isDeviceInPocket, final int reason) {
+            final boolean wasInPocket = mIsDeviceInPocket;
+            mIsDeviceInPocket = reason == PocketManager.REASON_SENSOR ? isDeviceInPocket : false;
             if (wasInPocket != mIsDeviceInPocket) {
                 mHandler.sendEmptyMessage(MSG_POCKET_STATE_CHANGED);
             }
         }
     };
-
-    public boolean isPocketLockVisible(){
-        return mPocketManager.isPocketLockVisible();
-    }
 
     private SparseBooleanArray mBiometricEnabledForUser = new SparseBooleanArray();
     private BiometricManager mBiometricManager;
@@ -2095,7 +2089,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         mDreamManager = IDreamManager.Stub.asInterface(
                 ServiceManager.getService(DreamService.DREAM_SERVICE));
 
-        mPocketManager = (PocketManager) context.getSystemService(Context.POCKET_SERVICE);
+        mPocketManager = context.getSystemService(PocketManager.class);
         if (mPocketManager != null) {
             mPocketManager.addCallback(mPocketCallback);
         }

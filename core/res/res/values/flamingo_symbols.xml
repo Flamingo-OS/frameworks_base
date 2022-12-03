@@ -93,7 +93,6 @@
     <java-symbol type="string" name="missing_sensors_permission_message" />
 
     <!-- Pocket Lock -->
-    <java-symbol type="layout" name="pocket_lock_view" />
     <java-symbol type="bool" name="config_pocketModeSupported" />
 
     <!-- Pocket bridge -->

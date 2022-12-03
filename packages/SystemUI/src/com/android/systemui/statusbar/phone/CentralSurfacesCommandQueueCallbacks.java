@@ -577,6 +577,16 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         mCentralSurfaces.setBlockedGesturalNavigation(blocked);
     }
 
+    @Override
+    public void showPocketLock() {
+        mCentralSurfaces.showPocketLock();
+    }
+
+    @Override
+    public void hidePocketLock() {
+        mCentralSurfaces.hidePocketLock();
+    }
+
     private boolean isGoingToSleep() {
         return mWakefulnessLifecycle.getWakefulness()
                 == WakefulnessLifecycle.WAKEFULNESS_GOING_TO_SLEEP;

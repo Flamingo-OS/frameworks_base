@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package android.pocket;
 
 import android.pocket.IPocketCallback;
@@ -26,18 +27,10 @@ interface IPocketService {
     // remove callback and stop getting notified about pocket state.
     void removeCallback(IPocketCallback callback);
 
-    // notify pocket service about intercative state changed.
-    // @see com.android.policy.PhoneWindowManager
-    void onInteractiveChanged(boolean interactive);
-
     // external processes can request changing listening state.
     void setListeningExternal(boolean listen);
 
     // check if device is in pocket.
     boolean isDeviceInPocket();
-
-    // Custom methods
-    void setPocketLockVisible(boolean visible);
-    boolean isPocketLockVisible();
 
 }

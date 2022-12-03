@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 The ParanoidAndroid Project
+ * Copyright (C) 2022 FlamingoOS Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package android.pocket;
+package com.android.server.pocket;
 
-/** @hide */
-interface IPocketCallback {
-
-    // notify when pocket state changes.
-    void onStateChanged(boolean isDeviceInPocket, int reason);
-
+/**
+ * @hide
+ */
+public interface PocketServiceInternal {
+    void onInteractiveChanged(boolean interactive);
+    void stopListening();
+    boolean isPocketLockShowing();
+    boolean isDeviceInPocket();
 }

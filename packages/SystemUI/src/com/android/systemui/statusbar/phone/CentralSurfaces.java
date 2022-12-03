@@ -577,6 +577,9 @@ public interface CentralSurfaces extends Dumpable, ActivityStarter, LifecycleOwn
 
     void setBlockedGesturalNavigation(boolean blocked);
 
+    void showPocketLock();
+    void hidePocketLock();
+
     public static class KeyboardShortcutsMessage {
         final int mDeviceId;
 

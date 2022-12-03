@@ -160,7 +160,6 @@ import com.android.server.people.PeopleService;
 import com.android.server.pm.ApexManager;
 import com.android.server.pm.ApexSystemServiceInfo;
 import com.android.server.pocket.PocketService;
-import com.android.server.pocket.PocketBridgeService;
 import com.android.server.pm.CrossProfileAppsService;
 import com.android.server.pm.DataLoaderManagerService;
 import com.android.server.pm.DynamicCodeLoggingService;
@@ -1643,6 +1642,12 @@ public final class SystemServer implements Dumpable {
             mDisplayManagerService.windowManagerAndInputReady();
             t.traceEnd();
 
+            if (context.getResources().getBoolean(R.bool.config_pocketModeSupported)) {
+                t.traceBegin("StartPocketService");
+                mSystemServiceManager.startService(PocketService.class);
+                t.traceEnd();
+            }
+
             if (mFactoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
                 Slog.i(TAG, "No Bluetooth Service (factory test)");
             } else if (!context.getPackageManager().hasSystemFeature
@@ -2570,10 +2575,6 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(CrossProfileAppsService.class);
             t.traceEnd();
 
-            t.traceBegin("StartPocketService");
-            mSystemServiceManager.startService(PocketService.class);
-            t.traceEnd();
-
             t.traceBegin("StartPeopleService");
             mSystemServiceManager.startService(PeopleService.class);
             t.traceEnd();
@@ -2589,13 +2590,6 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
                 t.traceBegin("StartLiveDisplayService");
                 mSystemServiceManager.startService(LiveDisplayService.class);
-                t.traceEnd();
-            }
-
-            if (!context.getResources().getString(
-                    com.android.internal.R.string.config_pocketBridgeSysfsInpocket).isEmpty()) {
-                t.traceBegin("StartPocketBridgeService");
-                mSystemServiceManager.startService(PocketBridgeService.class);
                 t.traceEnd();
             }
         }

@@ -1556,7 +1556,7 @@ public final class SystemServiceRegistry {
                                 Context.POCKET_SERVICE);
                         IPocketService service =
                                 IPocketService.Stub.asInterface(binder);
-                        return new PocketManager(ctx.getOuterContext(), service);
+                        return service == null ? null : new PocketManager(service);
                     }});
 
         sInitializing = true;
