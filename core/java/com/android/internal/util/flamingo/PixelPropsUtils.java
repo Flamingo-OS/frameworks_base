@@ -52,7 +52,7 @@ public final class PixelPropsUtils {
         entry("DEVICE", "cheetah"),
         entry("PRODUCT", "cheetah"),
         entry("MODEL", "Pixel 7 Pro"),
-        entry("FINGERPRINT", "google/cheetah/cheetah:13/T1B3.221003.003/9173718:user/release-keys")
+        entry("FINGERPRINT", "google/cheetah/cheetah:13/TD1A.221105.001/9104446:user/release-keys")
     );
 
     private static final Map<String, String> marlinProps = Map.ofEntries(
